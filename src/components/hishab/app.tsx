@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Home, Menu, Package, Wallet } from "lucide-react";
 import { FlowScreen, ReceiptScreen } from "@/components/hishab/flows";
+import { OnboardingScreen } from "@/components/hishab/onboarding";
 import {
   DuesScreen,
   EntryScreen,
@@ -25,6 +26,7 @@ const TABS: { id: TabId; label: string; icon: typeof Home }[] = [
 
 export function HishabApp() {
   const ready = useHishab((s) => s.ready);
+  const onboarded = useHishab((s) => s.onboarded);
   useEffect(() => {
     useHishab.getState().hydrate();
   }, []);
@@ -34,7 +36,7 @@ export function HishabApp() {
       <Aside />
       <div className="flex h-dvh w-full min-w-0 flex-col bg-paper lg:flex-1">
         <div className="mx-auto flex h-full w-full max-w-md flex-col">
-          {ready ? <Shell /> : <Splash />}
+          {!ready ? <Splash /> : onboarded ? <Shell /> : <OnboardingScreen />}
         </div>
       </div>
     </div>
@@ -87,7 +89,7 @@ function Aside() {
           </p>
         </div>
       ) : (
-        <p className="text-sm text-foam">রফিক ট্রেডার্সের ডেমো খাতা। দুই কেস লাইটার দিয়ে শুরু করুন।</p>
+        <p className="text-sm text-foam">নিজ দোকান তৈরি করে শুরু করুন।</p>
       )}
     </aside>
   );
