@@ -15,7 +15,7 @@ import { draftFromParse, parseUtterance, SAMPLES } from "./parser.ts";
 import { entryFromDraft, firstGap, previewDraft, READBACK_LIGHTER, readback } from "./flow.ts";
 import { banglaUnder100, startOfLocalDay, takaWords } from "./money.ts";
 import { makeSeed } from "./seed.ts";
-import { WAREHOUSE, partyLoc } from "./types.ts";
+import { WAREHOUSE, partyLoc, type Books } from "./types.ts";
 
 const now = new Date(2026, 10, 9, 15, 0, 0, 0).getTime();
 
@@ -161,5 +161,31 @@ describe("voice stays a form, not a posting", () => {
     assert.equal(paid.receivedTaka, 500);
     const mixed = parseUtterance("রহিম স্টোরে দুই কেস লাইটার রেখে এসেছি বিক্রিও করেছি", books);
     assert.equal(mixed.kind, null);
+  });
+});
+
+describe("audit never throws", () => {
+  it("returns ok:false instead of throwing on a malformed entry", () => {
+    const bad: Books = {
+      version: 1,
+      businessName: "x",
+      mode: "stock",
+      parties: [],
+      products: [],
+      entries: [
+        {
+          id: "bad-1",
+          kind: "sale",
+          at: now,
+          summary: "unbalanced",
+          lines: [{ account: "cash", debit: 100, credit: 0 }],
+          stock: [],
+          meta: {},
+        },
+      ],
+    };
+    // Must not throw; must report not-ok.
+    const report = audit(bad);
+    assert.equal(report.ok, false);
   });
 });
