@@ -20,7 +20,7 @@
  * `process.env`, which is why the merge has to happen before Vite starts.
  */
 import { spawn } from "node:child_process";
-import { readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { constants as osConstants } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -104,6 +104,14 @@ export function isMainModule(moduleUrl) {
   }
 }
 
+function resolveCommand(command) {
+  if (command.includes("/") || command.includes("\\")) return command;
+  const local = join(projectRoot(), "node_modules", ".bin", command);
+  if (process.platform === "win32" && existsSync(local + ".cmd")) return local + ".cmd";
+  if (existsSync(local)) return local;
+  return command;
+}
+
 function main(argv) {
   const [command, ...args] = argv;
   if (!command) {
@@ -111,7 +119,11 @@ function main(argv) {
     process.exit(2);
   }
   const env = mergeAppEnv(readAppEnv(projectRoot()), process.env);
-  const child = spawn(command, args, { stdio: "inherit", env });
+  const local = resolveCommand(command);
+  const child =
+    process.platform === "win32" && local.endsWith(".cmd")
+      ? spawn("cmd.exe", ["/c", local, ...args], { stdio: "inherit", env })
+      : spawn(local, args, { stdio: "inherit", env });
   // The dev server is long-running and is stopped by signalling this wrapper.
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
     process.on(signal, () => child.kill(signal));

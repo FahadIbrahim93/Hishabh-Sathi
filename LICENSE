@@ -1,0 +1,14 @@
+# License
+
+Hishab Sathi (the "Application").
+
+All rights reserved.
+
+No licence has been selected for this repository yet (decision D-03: proprietary vs source-available is open). Until a licence is added:
+
+- You may not copy, modify, distribute or sell the Application or any part of it.
+- No right is granted to use the Application for any commercial purpose.
+
+Contact the owner (Fahad Ibrahim, hopetheorybd@gmail.com) before using this code.
+
+Third-party dependencies remain under their own licences; see `package-lock.json` and `node_modules`.
