@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { apply, buildStockAdd } from "./engine.ts";
+import { apply, buildOpening, buildStockAdd } from "./engine.ts";
 import { makeSeed } from "./seed.ts";
 import { takaToPaisa } from "./money.ts";
 import { openDB, DBSchema, type IDBPDatabase } from "idb";
@@ -122,6 +122,7 @@ interface HishabState {
   nav: Screen[];
   draft: Draft | null;
   ready: boolean;
+  onboarded: boolean;
   saved: boolean;
   toast: string | null;
   hydrate: () => Promise<void>;
@@ -135,6 +136,8 @@ interface HishabState {
   addParty: (name: string, role: Party["role"]) => string;
   addProduct: (input: NewProduct) => string;
   setMode: (mode: Mode) => void;
+  setOnboarded: (value: boolean) => void;
+  createBusiness: (name: string, cashPaisa: number) => Promise<void>;
   resetDemo: () => void;
   dismissToast: () => void;
 }
@@ -158,6 +161,7 @@ export const useHishab = create<HishabState>((set, get) => ({
   nav: [{ id: "home" }],
   draft: null,
   ready: false,
+  onboarded: false,
   saved: true,
   toast: null,
   hydrate: async () => {
@@ -170,14 +174,19 @@ export const useHishab = create<HishabState>((set, get) => ({
         books = legacy;
         migrated = true;
       } else {
-        books = makeSeed();
+        books = emptyBooks();
       }
     }
     const saved = await persistDbBooks(books);
     if (migrated && saved) {
       localStorage.removeItem(LEGACY_KEY);
     }
-    set({ books, ready: true, saved });
+    set({
+      books,
+      ready: true,
+      saved,
+      onboarded: Boolean(books.businessName),
+    });
   },
   goTab: (id) => set({ nav: [{ id }], draft: null }),
   push: (screen) => set({ nav: [...get().nav, screen] }),
@@ -256,6 +265,24 @@ export const useHishab = create<HishabState>((set, get) => ({
     const books = { ...get().books, mode };
     set({ books, saved: true });
     persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
+  },
+  setOnboarded: (value) => set({ onboarded: value }),
+  createBusiness: async (name, cashPaisa) => {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("দোকানের নাম লিখুন।");
+    const books = { ...get().books, businessName: trimmed };
+    let opened = books;
+    if (cashPaisa > 0) {
+      opened = apply(books, buildOpening({
+        id: `open-${crypto.randomUUID()}`,
+        at: Date.now(),
+        cashPaisa,
+        stock: [],
+        products: [],
+      }));
+    }
+    set({ books: opened, onboarded: true, saved: true });
+    await persistSafe(opened);
   },
   resetDemo: () => {
     const books = makeSeed();
