@@ -343,10 +343,45 @@ export function MoreScreen() {
   const books = useHishab((s) => s.books);
   const setMode = useHishab((s) => s.setMode);
   const resetDemo = useHishab((s) => s.resetDemo);
+  const exportBooks = useHishab((s) => s.exportBooks);
+  const importBooks = useHishab((s) => s.importBooks);
   const push = useHishab((s) => s.push);
   const open = useOpen();
   const [arm, setArm] = useState(false);
   const report = audit(books);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreError, setRestoreError] = useState("");
+
+  const downloadBackup = () => {
+    const json = exportBooks();
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const stamp = new Date().toISOString().slice(0, 10);
+    a.download = `হিসাব-ব্যাকআপ-${stamp}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const doRestore = () => {
+    if (!restoreFile) return;
+    setRestoring(true);
+    setRestoreError("");
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        importBooks(reader.result as string);
+        setRestoreFile(null);
+      } catch (err) {
+        setRestoreError(err instanceof Error ? err.message : "ফেরায়নি।");
+      } finally {
+        setRestoring(false);
+      }
+    };
+    reader.readAsText(restoreFile);
+  };
 
   return (
     <div>
@@ -360,7 +395,39 @@ export function MoreScreen() {
           <p className="font-display text-3xl font-semibold text-ink">{formatTaka(balance(books, "cash"))}</p>
           <p className="mt-2 text-sm text-ink">{report.ok ? "প্রতিটি হিসাবের দুই দিক মিলেছে।" : "হিসাবে গরমিল। নতুন হিসাব বন্ধ রাখুন।"}</p>
         </div>
-        <h2 className="font-display text-lg font-semibold text-ink">খাতার ধরন</h2>
+        <h2 className="font-display text-lg font-semibold text-ink mt-8">ব্যাকআপ ও ফেরত আনা</h2>
+        <div className="rounded-2xl bg-card p-4 ring-1 ring-line">
+          <p className="text-sm text-ink-soft mb-3">
+            পুরো খাতা একটি ফাইলে সেভ রাখুন। ব্রাউজার মুছে গেলেও এই ফাইল দিয়ে ফেরত আনতে পারবেন।
+          </p>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <Primary onClick={downloadBackup}>
+              ব্যাকআপ নিন
+            </Primary>
+            <label className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-line bg-card font-display text-base font-semibold text-ink ring-1 ring-line cursor-pointer">
+              <input
+                type="file"
+                accept=".json"
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.currentTarget.files?.[0];
+                  if (file) setRestoreFile(file);
+                }}
+              />
+              ফাইল বেছে নিন
+            </label>
+          </div>
+          {restoreFile && (
+            <div className="grid grid-cols-2 gap-3">
+              <Primary onClick={doRestore} disabled={restoring}>
+                ফেরত আনুন
+              </Primary>
+              <Secondary onClick={() => setRestoreFile(null)}>বাতিল</Secondary>
+            </div>
+          )}
+          {restoreError ? <p className="mt-2 text-sm text-clay">{restoreError}</p> : null}
+        </div>
+        <h2 className="font-display text-lg font-semibold text-ink mt-8">খাতার ধরন</h2>
         <Choice
           title="সহজ খাতা"
           detail="বিক্রি, টাকা, খরচ। মালের তালিকা ছাড়াই।"
