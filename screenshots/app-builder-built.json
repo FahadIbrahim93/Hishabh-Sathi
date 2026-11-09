@@ -1,0 +1,41 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "হিসাব সাথী",
+      "hasCanvas": false,
+      "bodyTextLen": 873,
+      "bodyTextHash": "5df5535379e6a32f9f4a502d106512230ba10d1bcb1e1135acd063bb5dc96b05",
+      "bodyTextPrefix": "হিসাব সাথী দোকানের হিসাব, হিসাবের ভাষায়। কথা বললেই টাকা বদলায় না",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "হিসাব সাথী",
+      "hasCanvas": false,
+      "bodyTextLen": 590,
+      "bodyTextHash": "bf770133e42ac8c3624b189404191b5eebbdc40df20f7682c9571b7947ba0371",
+      "bodyTextPrefix": "হিসাব সাথী রফিক ট্রেডার্স · মাল ও বিতরণ এই ফোনে সেভ আছে আজকের হি",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": true,
+  "baselineReasons": [
+    "desktop: body text changed (302 -> 873 chars, hash mismatch)",
+    "mobile: body text changed (30 -> 590 chars, hash mismatch)"
+  ]
+}

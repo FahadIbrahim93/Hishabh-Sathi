@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Hind Siliguri", "Noto Sans Bengali", sans-serif;
+  --font-display: "Anek Bangla", "Hind Siliguri", sans-serif;
+
+  --color-paper: #f3efe4;
+  --color-paper-deep: #e6dfd0;
+  --color-card: #fffdf8;
+  --color-ink: #1c1914;
+  --color-ink-soft: #5e584e;
+  --color-line: #d9d0c0;
+  --color-palm: #0f6b4c;
+  --color-palm-deep: #0a4a35;
+  --color-palm-soft: #e5f4ec;
+  --color-foam: #d7efe3;
+  --color-saffron: #c47b09;
+  --color-saffron-soft: #fbf0d8;
+  --color-clay: #9c3418;
+  --color-clay-soft: #fde8df;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background: var(--color-palm-deep);
+    color: var(--color-ink);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-palm);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

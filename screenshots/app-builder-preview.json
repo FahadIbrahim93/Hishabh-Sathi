@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "হিসাব সাথী",
+      "hasCanvas": false,
+      "bodyTextLen": 302,
+      "bodyTextHash": "e7e5a0c18d5b3e4c742596b4e2b92147938f5913fd75a5fb1a870819e94475e0",
+      "bodyTextPrefix": "হিসাব সাথী দোকানের হিসাব, হিসাবের ভাষায়। কথা বললেই টাকা বদলায় না",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "হিসাব সাথী",
+      "hasCanvas": false,
+      "bodyTextLen": 30,
+      "bodyTextHash": "255af688635ceabc8d962a8dae2d266ab5e7b06b9c089df064f19c17264f75fb",
+      "bodyTextPrefix": "হিসাব সাথী আপনার ব্যবসার হিসাব",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
