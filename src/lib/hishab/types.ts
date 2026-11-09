@@ -18,7 +18,8 @@ export type EntryKind =
   | "consign"
   | "return"
   | "purchase"
-  | "expense";
+  | "expense"
+  | "reversal";
 
 export type FlowKind = "sale" | "collection" | "payment" | "consign" | "return" | "purchase" | "expense";
 
@@ -64,6 +65,7 @@ export interface EntryMeta {
   returnMode?: "sold" | "consign";
   fromConsignment?: boolean;
   packSize?: number;
+  reason?: string;
 }
 
 export interface Entry {
@@ -78,6 +80,7 @@ export interface Entry {
   meta: EntryMeta;
   costUpdate?: { productId: string; costPaisa: number };
   priceUpdate?: { productId: string; pricePaisa: number };
+  reversesEntryId?: string;
 }
 
 export interface Books {
