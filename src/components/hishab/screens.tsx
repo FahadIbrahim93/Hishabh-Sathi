@@ -14,7 +14,7 @@ import {
 import { Callout, Choice, Page, Primary, ScreenHeader, Secondary, TextField } from "@/components/hishab/bits";
 import { beginDraft } from "@/components/hishab/flows";
 import { audit, balance, collectedBetween, explain, productsAt, revenueBetween, stockAt } from "@/lib/hishab/engine";
-import { formatQty, formatTaka, formatWhen, startOfLocalDay } from "@/lib/hishab/money";
+import { formatQty, formatTaka, formatWhen, parseAmount, startOfLocalDay } from "@/lib/hishab/money";
 import { draftFromParse, parseUtterance, SAMPLES } from "@/lib/hishab/parser";
 import { firstGap } from "@/lib/hishab/flow";
 import { useHishab } from "@/lib/hishab/store";
@@ -305,11 +305,19 @@ export function StockScreen() {
             {error ? <Callout tone="warn" title="হয়নি" body={error} /> : null}
             <Primary
               onClick={() => {
-                const size = Number(packSize);
-                const priceTaka = Number(price);
-                const costTaka = Number(cost);
-                const opening = Number(qty);
-                if (!name.trim() || !Number.isInteger(size) || size < 1 || priceTaka <= 0 || costTaka < 0) {
+                const size = parseAmount(packSize);
+                const priceTaka = parseAmount(price);
+                const costTaka = parseAmount(cost);
+                const opening = parseAmount(qty);
+                if (
+                  !name.trim() ||
+                  !Number.isInteger(size) ||
+                  size < 1 ||
+                  !Number.isFinite(priceTaka) ||
+                  priceTaka <= 0 ||
+                  !Number.isFinite(costTaka) ||
+                  costTaka < 0
+                ) {
                   setError("নাম, কেসে কত পিস, আর বিক্রির দাম দিন।");
                   return;
                 }
@@ -320,7 +328,7 @@ export function StockScreen() {
                     packSize: size,
                     priceTaka,
                     costTaka,
-                    qty: Number.isInteger(opening) ? opening : 0,
+                    qty: Number.isFinite(opening) ? Math.trunc(opening) : 0,
                   });
                   setAdding(false);
                   setName("");

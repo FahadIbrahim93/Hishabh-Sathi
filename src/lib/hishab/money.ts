@@ -174,6 +174,26 @@ export function takaToPaisa(taka: number): number {
   return Math.round(taka) * 100;
 }
 
+/*
+ * Parse a numeric string that may carry Bangla or English digits, e.g.
+ * "৫০০", "500", "১৫.৫০". Returns NaN for anything that isn't a number.
+ * Used everywhere a user types an amount so Bangla digits never silently
+ * become NaN (SSOT blocker #7).
+ */
+export function parseAmount(input: string): number {
+  const bangla = "০১২৩৪৫৬৭৮৯";
+  const english = "0123456789";
+  let normalized = "";
+  for (const ch of input) {
+    const idx = bangla.indexOf(ch);
+    normalized += idx >= 0 ? english[idx] : ch;
+  }
+  const trimmed = normalized.trim();
+  if (trimmed === "") return NaN;
+  const value = Number(trimmed);
+  return Number.isFinite(value) ? value : NaN;
+}
+
 export function startOfLocalDay(ts: number): number {
   const d = new Date(ts);
   d.setHours(0, 0, 0, 0);
