@@ -2,9 +2,99 @@ import { create } from "zustand";
 import { apply, buildStockAdd } from "./engine.ts";
 import { makeSeed } from "./seed.ts";
 import { takaToPaisa } from "./money.ts";
+import { openDB, DBSchema, type IDBPDatabase } from "idb";
 import type { Books, Draft, Entry, Mode, Party, Product } from "./types.ts";
 
-const KEY = "hishab-sathi-v1";
+/* ------------------------------------------------------------------ */
+/* IndexedDB — versioned migration framework                          */
+/* ------------------------------------------------------------------ */
+/*
+ * DB_VERSION is the on-disk schema version. To change the data shape,
+ * bump DB_VERSION and add an `upgrade` branch for the new version.
+ * Migrations run in order on first open after a version bump, so an
+ * existing IndexedDB database is never overwritten — only upgraded.
+ */
+const DB_NAME = "hishab-sathi";
+const STORE_NAME = "books";
+const DB_KEY = "main";
+const DB_VERSION = 1;
+
+interface HishabDB extends DBSchema {
+  books: {
+    key: string;
+    value: Books;
+  };
+}
+
+let dbInstance: IDBPDatabase<HishabDB> | null = null;
+let dbReady: Promise<IDBPDatabase<HishabDB>> | null = null;
+
+async function openDb(): Promise<IDBPDatabase<HishabDB>> {
+  if (dbInstance) return dbInstance;
+  if (!dbReady) {
+    dbReady = openDB<HishabDB>(DB_NAME, DB_VERSION, {
+      upgrade(db, _oldVersion) {
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME);
+        }
+        // oldVersion < 2: future migrations go here, e.g.
+        // if (oldVersion < 2) { ... }
+      },
+    });
+  }
+  dbInstance = await dbReady;
+  return dbInstance;
+}
+
+async function readDbBooks(): Promise<Books | null> {
+  try {
+    const db = await openDb();
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const value = await tx.objectStore(STORE_NAME).get(DB_KEY);
+    await tx.done;
+    return value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function persistDbBooks(books: Books): Promise<boolean> {
+  try {
+    const db = await openDb();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    tx.objectStore(STORE_NAME).put(books, DB_KEY);
+    await tx.done;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Legacy localStorage migration (hishab-sathi-v1)                    */
+/* ------------------------------------------------------------------ */
+/*
+ * Phase 1: migrate data that still lives in one browser's localStorage
+ * into IndexedDB on first load, then drop the legacy key so the owner's
+ * books survive a browser clear.
+ */
+const LEGACY_KEY = "hishab-sathi-v1";
+
+function readLegacyBooks(): Books | null {
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (!raw) return null;
+    const books = JSON.parse(raw) as Books;
+    if (books.version !== 1 || !Array.isArray(books.entries) || !Array.isArray(books.parties)) return null;
+    return books;
+  } catch {
+    return null;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Zustand store                                                      */
+/* ------------------------------------------------------------------ */
 
 export type TabId = "home" | "dues" | "stock" | "more";
 
@@ -34,7 +124,7 @@ interface HishabState {
   ready: boolean;
   saved: boolean;
   toast: string | null;
-  hydrate: () => void;
+  hydrate: () => Promise<void>;
   goTab: (id: TabId) => void;
   push: (screen: Screen) => void;
   back: () => void;
@@ -53,25 +143,14 @@ function emptyBooks(): Books {
   return { version: 1, businessName: "", mode: "stock", parties: [], products: [], entries: [] };
 }
 
-function persist(books: Books): boolean {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(books));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function readBooks(): Books | null {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    const books = JSON.parse(raw) as Books;
-    if (books.version !== 1 || !Array.isArray(books.entries) || !Array.isArray(books.parties)) return null;
-    return books;
-  } catch {
-    return null;
-  }
+/*
+ * Persist writes are sequenced so a slower earlier write can never
+ * overwrite a newer one (fire-and-forget from sync actions).
+ */
+let persistChain: Promise<unknown> = Promise.resolve();
+function persistSafe(books: Books): Promise<void> {
+  persistChain = persistChain.then(() => persistDbBooks(books).catch(() => undefined));
+  return persistChain as Promise<void>;
 }
 
 export const useHishab = create<HishabState>((set, get) => ({
@@ -81,11 +160,23 @@ export const useHishab = create<HishabState>((set, get) => ({
   ready: false,
   saved: true,
   toast: null,
-  hydrate: () => {
+  hydrate: async () => {
     if (get().ready) return;
-    const stored = readBooks();
-    const books = stored ?? makeSeed();
-    const saved = persist(books);
+    let books = await readDbBooks();
+    let migrated = false;
+    if (!books) {
+      const legacy = readLegacyBooks();
+      if (legacy) {
+        books = legacy;
+        migrated = true;
+      } else {
+        books = makeSeed();
+      }
+    }
+    const saved = await persistDbBooks(books);
+    if (migrated && saved) {
+      localStorage.removeItem(LEGACY_KEY);
+    }
     set({ books, ready: true, saved });
   },
   goTab: (id) => set({ nav: [{ id }], draft: null }),
@@ -115,10 +206,10 @@ export const useHishab = create<HishabState>((set, get) => ({
   },
   commitEntry: (entry) => {
     const books = apply(get().books, entry);
-    const saved = persist(books);
     const nav = get().nav.filter((screen) => screen.id !== "flow");
     nav.push({ id: "receipt", entryId: entry.id });
-    set({ books, saved, nav, draft: null, toast: "হিসাব সেভ হয়েছে" });
+    set({ books, saved: true, nav, draft: null, toast: "হিসাব সেভ হয়েছে" });
+    persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
   },
   addParty: (name, role) => {
     const trimmed = name.trim();
@@ -126,7 +217,8 @@ export const useHishab = create<HishabState>((set, get) => ({
     const id = `p-${crypto.randomUUID()}`;
     const party: Party = { id, name: trimmed, aliases: [trimmed], role };
     const books = { ...get().books, parties: [...get().books.parties, party] };
-    set({ books, saved: persist(books) });
+    set({ books, saved: true });
+    persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
     return id;
   },
   addProduct: (input) => {
@@ -156,22 +248,25 @@ export const useHishab = create<HishabState>((set, get) => ({
         }),
       );
     }
-    set({ books, saved: persist(books), toast: "মাল যোগ হয়েছে" });
+    set({ books, saved: true, toast: "মাল যোগ হয়েছে" });
+    persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
     return id;
   },
   setMode: (mode) => {
     const books = { ...get().books, mode };
-    set({ books, saved: persist(books) });
+    set({ books, saved: true });
+    persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
   },
   resetDemo: () => {
     const books = makeSeed();
     set({
       books,
-      saved: persist(books),
+      saved: true,
       nav: [{ id: "home" }],
       draft: null,
       toast: "ডেমো হিসাব আবার বসানো হয়েছে",
     });
+    persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
   },
   dismissToast: () => set({ toast: null }),
 }));
