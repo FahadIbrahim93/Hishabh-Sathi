@@ -518,6 +518,11 @@ export function LedgerScreen() {
 export function EntryScreen({ entryId }: { entryId: string }) {
   const books = useHishab((s) => s.books);
   const back = useHishab((s) => s.back);
+  const reverseEntry = useHishab((s) => s.reverseEntry);
+  const [reason, setReason] = useState("");
+  const [reversing, setReversing] = useState(false);
+  const [error, setError] = useState("");
+
   const entry = books.entries.find((item) => item.id === entryId);
   if (!entry) {
     return (
@@ -530,6 +535,26 @@ export function EntryScreen({ entryId }: { entryId: string }) {
     );
   }
   const view = explain(books, entry);
+  const canReverse =
+    entry.kind !== "opening" && entry.kind !== "reversal";
+
+  const doReverse = () => {
+    if (reversing || !reason.trim()) return;
+    setReversing(true);
+    setError("");
+    try {
+      reverseEntry(entry.id, reason.trim());
+      setReason("");
+      back();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "হিসাব বিলোপ করতে পারিনি।",
+      );
+    } finally {
+      setReversing(false);
+    }
+  };
+
   return (
     <div>
       <ScreenHeader title={view.title} onBack={back} />
@@ -544,6 +569,22 @@ export function EntryScreen({ entryId }: { entryId: string }) {
           ))}
         </div>
         {view.foot ? <Callout title="মনে রাখবেন" body={view.foot} /> : null}
+        {canReverse ? (
+          <div className="mt-5 space-y-3">
+            <TextField
+              label="বিলোপের কারণ"
+              placeholder="কেন বিলোপ করছেন?"
+              value={reason}
+              onChange={(value) => setReason(value)}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <Primary onClick={doReverse} disabled={reversing || !reason.trim()}>
+                বিলোপ করুন
+              </Primary>
+            </div>
+            {error ? <p className="text-sm text-clay">{error}</p> : null}
+          </div>
+        ) : null}
       </Page>
     </div>
   );

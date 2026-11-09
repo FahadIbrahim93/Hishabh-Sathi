@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { apply, buildOpening, buildStockAdd } from "./engine.ts";
+import { apply, buildOpening, buildReversal, buildStockAdd } from "./engine.ts";
 import { makeSeed } from "./seed.ts";
 import { takaToPaisa } from "./money.ts";
 import { openDB, DBSchema, type IDBPDatabase } from "idb";
@@ -138,6 +138,7 @@ interface HishabState {
   setMode: (mode: Mode) => void;
   setOnboarded: (value: boolean) => void;
   createBusiness: (name: string, cashPaisa: number) => Promise<void>;
+  reverseEntry: (entryId: string, reason: string) => void;
   resetDemo: () => void;
   dismissToast: () => void;
 }
@@ -283,6 +284,27 @@ export const useHishab = create<HishabState>((set, get) => ({
     }
     set({ books: opened, onboarded: true, saved: true });
     await persistSafe(opened);
+  },
+  reverseEntry: (entryId: string, reason: string) => {
+    const books = get().books;
+    const original = books.entries.find((e) => e.id === entryId);
+    if (!original) throw new Error("হিসাব পাওয়া যায়নি।");
+    if (original.kind === "opening" || original.kind === "reversal") {
+      throw new Error("এই হিসাব বিলোপ করা যায় না।");
+    }
+    const trimmed = reason.trim();
+    if (!trimmed) throw new Error("বিলোপের কারণ লিখুন।");
+    const reversal = buildReversal({
+      id: `rev-${crypto.randomUUID()}`,
+      at: Date.now(),
+      original,
+      reason: trimmed,
+    });
+    const next = apply(books, reversal);
+    set({ books: next, saved: true, toast: "হিসাব বিলোপ করা হয়েছে" });
+    persistSafe(next).catch(() =>
+      set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }),
+    );
   },
   resetDemo: () => {
     const books = makeSeed();

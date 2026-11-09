@@ -164,6 +164,10 @@ export function explain(books: Books, entry: Entry): Explained {
       add("খাতা", entry.meta.label);
       add("খরচ", formatTaka(entry.meta.total ?? 0));
       return { title: "খরচ", rows };
+    case "reversal":
+      add("মূল হিসাব", entry.summary);
+      if (entry.meta.reason) add("কারণ", entry.meta.reason);
+      return { title: "হিসাব বিলোপ", rows };
     default:
       return { title: "হিসাব", rows: [] };
   }
@@ -279,6 +283,37 @@ export function audit(books: Books): { ok: boolean; debit: number; credit: numbe
     if (stockAt(books, productId, location) < 0) return { ok: false, debit, credit };
   }
   return { ok: debit === credit, debit, credit };
+}
+
+export function buildReversal(input: {
+  id: string;
+  at: number;
+  original: Entry;
+  reason: string;
+}): Entry {
+  const lines: JournalLine[] = input.original.lines.map((row) => ({
+    account: row.account,
+    partyId: row.partyId,
+    debit: row.credit,
+    credit: row.debit,
+  }));
+  const stock: StockMove[] = input.original.stock.map((move) => ({
+    productId: move.productId,
+    location: move.location,
+    qtyDelta: -move.qtyDelta,
+  }));
+  return finish({
+    id: input.id,
+    kind: "reversal",
+    at: input.at,
+    partyId: input.original.partyId,
+    productId: input.original.productId,
+    summary: `বিলোপ · ${input.original.summary} · "${input.reason}"`,
+    lines,
+    stock,
+    meta: { ...input.original.meta, reason: input.reason },
+    reversesEntryId: input.original.id,
+  });
 }
 
 export function buildOpening(input: {
