@@ -266,7 +266,11 @@ export function audit(books: Books): { ok: boolean; debit: number; credit: numbe
   let debit = 0;
   let credit = 0;
   for (const entry of books.entries) {
-    finish(entry);
+    try {
+      finish(entry);
+    } catch {
+      return { ok: false, debit, credit };
+    }
     for (const row of entry.lines) {
       debit += row.debit;
       credit += row.credit;
