@@ -133,8 +133,12 @@ interface HishabState {
   patchDraft: (patch: Partial<Draft>) => void;
   flowBack: (step: Draft["step"] | "exit") => void;
   commitEntry: (entry: Entry) => void;
-  addParty: (name: string, role: Party["role"]) => string;
+  addParty: (name: string, role: Party["role"], phone?: string) => string;
   addProduct: (input: NewProduct) => string;
+  editParty: (id: string, patch: { name?: string; phone?: string; role?: Party["role"] }) => void;
+  archiveParty: (id: string) => void;
+  editProduct: (id: string, patch: { name?: string; packName?: string; packSize?: number; priceTaka?: number; costTaka?: number }) => void;
+  archiveProduct: (id: string) => void;
   setMode: (mode: Mode) => void;
   setOnboarded: (value: boolean) => void;
   createBusiness: (name: string, cashPaisa: number) => Promise<void>;
@@ -223,11 +227,11 @@ export const useHishab = create<HishabState>((set, get) => ({
     set({ books, saved: true, nav, draft: null, toast: "হিসাব সেভ হয়েছে" });
     persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
   },
-  addParty: (name, role) => {
+  addParty: (name, role, phone?) => {
     const trimmed = name.trim();
     if (!trimmed) throw new Error("দোকানের নাম লিখুন।");
     const id = `p-${crypto.randomUUID()}`;
-    const party: Party = { id, name: trimmed, aliases: [trimmed], role };
+    const party: Party = { id, name: trimmed, aliases: [trimmed], role, phone: phone?.trim() || undefined };
     const books = { ...get().books, parties: [...get().books.parties, party] };
     set({ books, saved: true });
     persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
@@ -263,6 +267,55 @@ export const useHishab = create<HishabState>((set, get) => ({
     set({ books, saved: true, toast: "মাল যোগ হয়েছে" });
     persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
     return id;
+  },
+  editParty: (id, patch) => {
+    const books = get().books;
+    const party = books.parties.find((p) => p.id === id);
+    if (!party) throw new Error("দোকান পাওয়া যায়নি।");
+    const next = books.parties.map((p) => (p.id === id ? { ...p, ...patch } : p));
+    set({ books: { ...books, parties: next }, saved: true });
+    persistSafe({ ...books, parties: next }).catch(() =>
+      set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }),
+    );
+  },
+  archiveParty: (id) => {
+    const books = get().books;
+    const party = books.parties.find((p) => p.id === id);
+    if (!party) throw new Error("দোকান পাওয়া যায়নি।");
+    const next = books.parties.map((p) => (p.id === id ? { ...p, archived: true } : p));
+    set({ books: { ...books, parties: next }, saved: true });
+    persistSafe({ ...books, parties: next }).catch(() =>
+      set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }),
+    );
+  },
+  editProduct: (id, patch) => {
+    const books = get().books;
+    const product = books.products.find((p) => p.id === id);
+    if (!product) throw new Error("মাল পাওয়া যায়নি।");
+    if (patch.packSize != null && (!Number.isInteger(patch.packSize) || patch.packSize < 1)) {
+      throw new Error("কেসে কত পিস, সেটা বলুন।");
+    }
+    const next = books.products.map((p) => {
+      if (p.id !== id) return p;
+      const updated: Product = { ...p, ...patch };
+      if (patch.priceTaka != null) updated.pricePaisa = takaToPaisa(patch.priceTaka);
+      if (patch.costTaka != null) updated.costPaisa = takaToPaisa(patch.costTaka);
+      return updated;
+    });
+    set({ books: { ...books, products: next }, saved: true });
+    persistSafe({ ...books, products: next }).catch(() =>
+      set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }),
+    );
+  },
+  archiveProduct: (id) => {
+    const books = get().books;
+    const product = books.products.find((p) => p.id === id);
+    if (!product) throw new Error("মাল পাওয়া যায়নি।");
+    const next = books.products.map((p) => (p.id === id ? { ...p, archived: true } : p));
+    set({ books: { ...books, products: next }, saved: true });
+    persistSafe({ ...books, products: next }).catch(() =>
+      set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }),
+    );
   },
   setMode: (mode) => {
     const books = { ...get().books, mode };

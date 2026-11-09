@@ -30,6 +30,8 @@ export interface Party {
   name: string;
   aliases: string[];
   role: "customer" | "supplier";
+  phone?: string;
+  archived?: boolean;
 }
 
 export interface Product {
@@ -40,6 +42,7 @@ export interface Product {
   packSize: number;
   pricePaisa: number;
   costPaisa: number;
+  archived?: boolean;
 }
 
 export interface JournalLine {
