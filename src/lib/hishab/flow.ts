@@ -253,12 +253,6 @@ function bannerFor(
     }
     return { title: "টাকা দিয়েছেন", body: "নগদ কমবে। বিক্রি বাড়বে না।" };
   }
-  if (kind === "payment") {
-    return {
-      title: "টাকা দিয়েছেন",
-      body: "পেয়েছি নয়। নগদ কমবে। দেনা থাকলে সেটা শোধ, না থাকলে পাওনা বাড়বে।",
-    };
-  }
   if (fromConsignment) {
     return {
       title: "রাখা মাল এখন বিক্রি",
