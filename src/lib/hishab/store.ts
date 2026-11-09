@@ -139,6 +139,8 @@ interface HishabState {
   setOnboarded: (value: boolean) => void;
   createBusiness: (name: string, cashPaisa: number) => Promise<void>;
   reverseEntry: (entryId: string, reason: string) => void;
+  exportBooks: () => string;
+  importBooks: (json: string) => void;
   resetDemo: () => void;
   dismissToast: () => void;
 }
@@ -303,6 +305,32 @@ export const useHishab = create<HishabState>((set, get) => ({
     const next = apply(books, reversal);
     set({ books: next, saved: true, toast: "হিসাব বিলোপ করা হয়েছে" });
     persistSafe(next).catch(() =>
+      set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }),
+    );
+  },
+  exportBooks: () => {
+    return JSON.stringify(get().books, null, 2);
+  },
+  importBooks: (json) => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(json);
+    } catch {
+      throw new Error("ভুল ফাইল। এই ব্যাকআপ ফেরায়নি।");
+    }
+    const books = parsed as Books;
+    if (
+      !books ||
+      books.version !== 1 ||
+      !Array.isArray(books.entries) ||
+      !Array.isArray(books.parties) ||
+      !Array.isArray(books.products) ||
+      typeof books.businessName !== "string"
+    ) {
+      throw new Error("ভুল ফাইল। এই ব্যাকআপ ফেরায়নি।");
+    }
+    set({ books, saved: true, toast: "ব্যাকআপ ফেরত আনা হয়েছে" });
+    persistSafe(books).catch(() =>
       set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }),
     );
   },
