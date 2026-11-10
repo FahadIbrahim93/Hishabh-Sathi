@@ -733,6 +733,64 @@ export function collectedBetween(books: Books, start: number, end: number): numb
   return total;
 }
 
+export function cogsBetween(books: Books, start: number, end: number): number {
+  let debit = 0;
+  for (const entry of books.entries) {
+    if (entry.at < start || entry.at >= end) continue;
+    for (const row of entry.lines) {
+      if (row.account === "cogs") debit += row.debit;
+    }
+  }
+  return debit;
+}
+
+export function expenseBetween(books: Books, start: number, end: number): number {
+  let credit = 0;
+  for (const entry of books.entries) {
+    if (entry.at < start || entry.at >= end) continue;
+    if (entry.kind !== "expense") continue;
+    for (const row of entry.lines) {
+      if (row.account === "expense") credit += row.credit;
+    }
+  }
+  return credit;
+}
+
+export function profitBetween(books: Books, start: number, end: number): number {
+  return revenueBetween(books, start, end) - cogsBetween(books, start, end) - expenseBetween(books, start, end);
+}
+
+export type DueAging = {
+  partyId: string;
+  partyName: string;
+  receivable: number;
+  days: number;
+  bucket: "0-7" | "8-30" | "30+";
+};
+
+export function duesAging(books: Books, now = Date.now()): DueAging[] {
+  const oneDay = 86_400_000;
+  const rows: DueAging[] = [];
+  for (const party of books.parties) {
+    if (party.archived) continue;
+    const receivable = balance(books, "receivable", party.id);
+    if (receivable <= 0) continue;
+    let lastAt = 0;
+    for (const entry of books.entries) {
+      if (entry.partyId !== party.id) continue;
+      const touchesReceivable = entry.lines.some((row) => row.account === "receivable");
+      if (touchesReceivable && entry.at > lastAt) lastAt = entry.at;
+    }
+    const days = lastAt > 0 ? Math.floor((now - lastAt) / oneDay) : 0;
+    let bucket: DueAging["bucket"] = "0-7";
+    if (days > 30) bucket = "30+";
+    else if (days > 7) bucket = "8-30";
+    rows.push({ partyId: party.id, partyName: party.name, receivable, days, bucket });
+  }
+  rows.sort((a, b) => b.receivable - a.receivable);
+  return rows;
+}
+
 export function productsAt(books: Books, location: string): { product: Product; qty: number }[] {
   return books.products
     .map((product) => ({ product, qty: stockAt(books, product.id, location) }))

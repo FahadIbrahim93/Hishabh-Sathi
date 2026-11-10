@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Home, Menu, Package, Wallet } from "lucide-react";
 import { FlowScreen, ReceiptScreen } from "@/components/hishab/flows";
 import { OnboardingScreen } from "@/components/hishab/onboarding";
+import { ReportsScreen } from "@/components/hishab/reports";
 import {
   DuesScreen,
   EntryScreen,
@@ -122,6 +123,7 @@ function Shell() {
         {screen.id === "entry" ? <EntryScreen entryId={screen.entryId} /> : null}
         {screen.id === "flow" ? <FlowScreen /> : null}
         {screen.id === "receipt" ? <ReceiptScreen entryId={screen.entryId} /> : null}
+        {screen.id === "report" ? <ReportsScreen /> : null}
       </div>
       {toast ? (
         <button type="button" onClick={dismissToast} className="bg-ink px-4 py-3 text-center text-sm text-paper">
