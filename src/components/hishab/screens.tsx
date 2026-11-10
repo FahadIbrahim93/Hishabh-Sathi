@@ -449,7 +449,7 @@ export function MoreScreen() {
           onClick={() => setMode("stock")}
         />
         <Secondary onClick={() => open("expense")}>খরচ করেছি</Secondary>
-        <Secondary onClick={() => push({ id: "ledger" })}>পুরো হিসাব</Secondary>
+        <Secondary onClick={() => push({ id: "report" })}>পুরো হিসাব</Secondary>
         <Secondary onClick={() => push({ id: "guide" })}>কীভাবে হিসাব হয়</Secondary>
         {arm ? (
           <Callout tone="warn" title="ডেমো আবার শুরু?" body="আপনার নতুন হিসাব মুছে রফিক ট্রেডার্সের আগের খাতা বসবে।" />

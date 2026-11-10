@@ -103,6 +103,7 @@ export type Screen =
   | { id: "visit" }
   | { id: "shop"; partyId: string }
   | { id: "ledger" }
+  | { id: "report" }
   | { id: "guide" }
   | { id: "entry"; entryId: string }
   | { id: "flow" }
