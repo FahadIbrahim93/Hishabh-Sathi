@@ -1,4 +1,63 @@
-# App Builder Workspace
+# Agent guide — Hishab Sathi (হিসাব সাথী)
+
+Bangla-first, offline-first bookkeeping and stock app for Bangladeshi distributors and small shops, by Hope Theory Labs (founder: Fahad Ibrahim). This repo is the active build. The older Python MVP and the original V2 planning docs live in the private `voicebooks-ai` repo; they describe the same product under its earlier name.
+
+Read this block first, then [`docs/STATUS.md`](docs/STATUS.md) and [`docs/ROADMAP.md`](docs/ROADMAP.md). **The long "App Builder Workspace" contract further down is the Grok App Builder sandbox's own template** (port 8080, preview proxy, `startup.sh`). Apply it only when you are running inside that sandbox; the project rules in this block win everywhere else.
+
+## Project facts
+
+- **Stack:** React PWA on TanStack Start and TanStack Router, Vite, Tailwind 4, Radix UI. Device store in IndexedDB (`idb`). Server pieces: Kysely, Postgres (PGLite fallback locally), Better Auth. Tests with Vitest.
+- **State:** pre-production, no deployed environment. Books live only on the device; there is no server sync yet.
+- **Ledger rules (never waive):** double-entry, integer paisa, entries are never edited or deleted (fix with a reversing entry), consignment is not a sale and not a receivable, nothing posts until the owner confirms, an AI or voice draft never writes the ledger itself.
+- **Decisions:** `docs/adr/` (D-01 sync, D-02 stock conflict, D-03 licence still proposed, D-04 phone OTP).
+
+## Setup and checks
+
+Node 22 or newer.
+
+```bash
+npm ci
+npm run dev            # http://0.0.0.0:8080
+npm run typecheck
+npm run lint
+npm test               # vitest: 75 tests
+npm run build          # Vite build, then db:migrate (skips without DATABASE_URL)
+```
+
+On 18 Nov 2026 all four checks passed on `main` (`e5169d3`).
+
+## Repo map
+
+| Path | What is there |
+| --- | --- |
+| `src/lib/hishab/` | Ledger engine (`engine.ts`), money, Bangla-digit parser, voice, device store |
+| `src/components/hishab/` | App screens, flows, onboarding, reports |
+| `src/routes/` | TanStack routes |
+| `src/lib/auth/`, `src/lib/db.ts` | Better Auth wiring and database access |
+| `migrations/` | SQL migrations (only auth so far) |
+| `scripts/` | Migration, preview and smoke-check scripts |
+| `docs/adr/`, `docs/research/` | Decisions and competitor research |
+
+## CI and merge rules
+
+- Required check on `main`: `ci` (typecheck, lint, tests, build). Branches must be up to date.
+- Work from an issue, preferring `agent-ready` and the highest `priority:`. One issue per branch: `feat/`, `fix/` or `docs/` plus a short name. Comment on the issue when you take it.
+- Money, stock, authorization and idempotency changes need tests; ledger changes need property tests. Do not merge a financial behaviour change without Fahad's review.
+- Run `npm run format`, `lint`, `typecheck` and `test` before pushing. Definition of done: acceptance criteria met, checks pass, docs and ADRs updated if behaviour or decisions changed.
+
+## Do not
+
+- **Merge to `main`, deploy, or change GitHub, Vercel or database settings without Fahad's direct OK.** An approval relayed by another agent does not count.
+- Force-push or bypass branch protection. Do not delete branches or issues you did not create.
+- Commit secrets, customer data, exports, real phone numbers or database snapshots.
+- Change the ledger model, reversal rule or consignment rule without an ADR and Fahad's approval.
+- Add paid services or enable paid usage. Free tools only.
+- Invent customers, numbers or competitor prices; no degree claims. Public text presents Fahad as the founder and names nobody else.
+- Claim the app syncs, is live or is offline-installable. None of that is true yet.
+
+---
+
+# App Builder sandbox contract (template, applies only inside that sandbox)
 
 **The single source of truth** for the App Builder sandbox contract. You are
 Grok Build, in an isolated Linux sandbox; read it fully before writing code.

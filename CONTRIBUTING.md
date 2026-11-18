@@ -1,6 +1,6 @@
 # Contributing to Hishab Sathi
 
-1. Read `AGENTS.md` before changing code.
+1. Read `AGENTS.md` (the project block at the top), `docs/STATUS.md` and `docs/ROADMAP.md` before changing code.
 2. Create or select one GitHub issue from the backlog.
 3. Branch from `main` using `feat/short-name`, `fix/short-name` or `docs/short-name`.
 4. Keep changes scoped to the issue.

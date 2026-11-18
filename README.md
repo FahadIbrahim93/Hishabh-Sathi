@@ -18,7 +18,7 @@ The differentiator:
 
 ## Tech stack (baseline)
 
-- Client: React PWA, TanStack Start + TanStack Router, IndexedDB local store, TanStack Router
+- Client: React app on TanStack Start + TanStack Router, IndexedDB local store. The PWA manifest and service worker are not built yet.
 - Server: TypeScript on Node, Postgres (Kysely), phone + OTP auth (Better Auth)
 - Ledger: append-only events, idempotent `apply`; all money in integer paisa (BDT)
 
@@ -26,7 +26,9 @@ See `docs/adr/` for the architecture decisions (D-01 to D-04).
 
 ## Repo status
 
-Phase 0 (foundations and cleanup) in progress. See the open questions in `docs/adr/` and the roadmap in the project SSOT.
+Pre-production, nothing deployed. Phases 0 and 1 are merged (ledger engine, on-device storage, reversals, backup and restore, catalog editing, reports). Next: security fixes, offline install, then server sync. See [docs/STATUS.md](docs/STATUS.md) and [docs/ROADMAP.md](docs/ROADMAP.md). Decisions are in `docs/adr/`; coding agents start with [AGENTS.md](AGENTS.md).
+
+This is the same product as the private `voicebooks-ai` repo (its earlier name and Python MVP).
 
 ## Run locally
 
