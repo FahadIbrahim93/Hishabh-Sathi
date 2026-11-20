@@ -1,15 +1,25 @@
 # Hishab Sathi engineering session
 
 **20 November 2026 · Dhaka**
+## Startup recovery · 20 November 2026
+
+**Current task** — Startup recovery is implemented and tested in [draft PR #26](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/26), built on [receipt PR #24](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/24). Both await review. [Startup-only diff](https://github.com/FahadIbrahim93/Hishabh-Sathi/compare/fix/receipt-durability...fix/startup-recovery)
+
+**Completed.** Startup now distinguishes a missing record from a failed read. If IndexedDB cannot read the books, the app shows “হিসাব খোলা যায়নি” and a retry button, keeps onboarding closed, and issues zero ledger writes. A successful read of existing books also issues zero writes. A genuinely new device still reaches onboarding. Concurrent startup calls share one read. Migration retains the legacy copy until the IndexedDB transaction commits.
+
+**Verification.** The original code issued one ledger write after a failed read. Three regression cases failed against that baseline. The fixed implementation passed 85 tests, typecheck, lint and build. Lint reported three existing warnings. Chrome aborted a real IndexedDB read after a ৳600 collection, retried through the Bangla screen and recovered exactly one collection and ৳7,400 in dues. [Failing baseline](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44737663909) · [Passing implementation](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44737878033)
+
+**Next proposed task, pending confirmation.** Validate manual backup restore before replacing the current books. A malformed or unbalanced backup should show a Bangla error and leave the original books intact after reload. A valid backup should restore its entries and balances.
+
 ## Receipt durability · 20 November 2026
 
-**Current task** — Await review of [draft PR #24](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/24), which addresses [issue #23](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/23). The implementation and regression tests are on the PR branch. Merging requires owner approval.
+**Review status** — Await review of [draft PR #24](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/24), which addresses [issue #23](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/23). The implementation and regression tests are on the PR branch. Merging requires owner approval.
 
 **Completed.** The shared entry confirmation flow now waits for the IndexedDB transaction to commit before changing the balance, clearing the draft or showing a receipt. A failed write leaves the shop and amount available for retry and displays a Bangla error. Repeated taps on the same pending entry share one save. A confirmation based on older books is rejected if the device copy has changed.
 
 **Verification.** The original code displayed a receipt while a write was pending. All three new store tests failed against that baseline, while the previous 75 tests passed. After the fix, the suite passed all 79 tests, including a Chrome check of the Bangla confirmation form with real IndexedDB. That check aborted a write, retried, reloaded the page and found exactly one ৳600 collection. Rahim's dues went from ৳8,000 to ৳7,400. Typecheck, lint and build passed. Lint reported three existing warnings. [Failing baseline](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44642403246) · [Passing implementation](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44643084484)
 
-**Next proposed task, pending confirmation.** Protect startup recovery. If reading existing books fails, show a recoverable error and issue zero writes. Retry should load the original entries and balances. A genuinely empty database should still allow onboarding.
+**Follow-up selected for the next session.** Protect startup recovery. If reading existing books fails, show a recoverable error and issue zero writes. Retry should load the original entries and balances. A genuinely empty database should still allow onboarding.
 
 ## Initial assessment · 20 November 2026
 

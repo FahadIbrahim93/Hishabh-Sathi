@@ -18,8 +18,8 @@ const fixture = `<html lang="bn"><body><div id="root"></div><script type="module
   import {blankDraft} from "/src/lib/hishab/flow.ts";
   const firstVisit = !sessionStorage.getItem("seeded");
   if (firstVisit) localStorage.setItem("hishab-sathi-v1", JSON.stringify(makeSeed()));
-  await useHishab.getState().hydrate();
   if (firstVisit) {
+    await useHishab.getState().hydrate();
     sessionStorage.setItem("seeded", "1");
     useHishab.getState().openDraft(blankDraft("collection", {
       step: "confirm", partyId: "rahim", amountTaka: 600
@@ -79,6 +79,27 @@ it.skipIf(!chrome && !process.env.CI)("retries an aborted device write from the 
       const result = await page.evaluate("window.readReceiptBooks()");
       // Seeded Rahim owes ৳8,000. One ৳600 payment leaves ৳7,400.
       expect(result).toEqual({ entries: 1, due: 740_000 });
+
+      // Reopen the same book with one transient IndexedDB read failure.
+      await page.addInitScript(() => {
+        const get = IDBObjectStore.prototype.get;
+        IDBObjectStore.prototype.get = function (...args) {
+          const request = get.apply(this, args);
+          if (this.name === "books") {
+            IDBObjectStore.prototype.get = get;
+            this.transaction.abort();
+          }
+          return request;
+        };
+      });
+      await page.reload();
+      const retry = page.getByRole("button", { name: "আবার চেষ্টা করুন", exact: true });
+      await retry.waitFor();
+      expect(await page.locator('[data-screen="home"]').count()).toBe(0);
+      expect(await page.getByText("দোকানের নাম", { exact: true }).count()).toBe(0);
+      await retry.click();
+      await page.locator('[data-screen="home"]').waitFor();
+      expect(await page.evaluate("window.readReceiptBooks()")).toEqual(result);
     } finally {
       await browser.close();
     }

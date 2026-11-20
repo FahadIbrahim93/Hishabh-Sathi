@@ -40,6 +40,10 @@ async function openDb(): Promise<IDBPDatabase<HishabDB>> {
         // oldVersion < 2: future migrations go here, e.g.
         // if (oldVersion < 2) { ... }
       },
+      terminated() {
+        dbInstance = null;
+        dbReady = null;
+      },
     }).catch((error) => {
       dbReady = null;
       throw error;
@@ -47,18 +51,6 @@ async function openDb(): Promise<IDBPDatabase<HishabDB>> {
   }
   dbInstance = await dbReady;
   return dbInstance;
-}
-
-async function readDbBooks(): Promise<Books | null> {
-  try {
-    const db = await openDb();
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const value = await tx.objectStore(STORE_NAME).get(DB_KEY);
-    await tx.done;
-    return value ?? null;
-  } catch {
-    return null;
-  }
 }
 
 async function persistDbBooks(books: Books): Promise<boolean> {
@@ -104,16 +96,39 @@ async function writeConfirmedBooks(previous: Books, next: Books): Promise<void> 
  */
 const LEGACY_KEY = "hishab-sathi-v1";
 
-function readLegacyBooks(): Books | null {
-  try {
-    const raw = localStorage.getItem(LEGACY_KEY);
-    if (!raw) return null;
-    const books = JSON.parse(raw) as Books;
-    if (books.version !== 1 || !Array.isArray(books.entries) || !Array.isArray(books.parties)) return null;
-    return books;
-  } catch {
-    return null;
+function checkBooks(value: unknown): Books {
+  const books = value as Partial<Books> | null;
+  if (!books || books.version !== 1 || typeof books.businessName !== "string" ||
+      !Array.isArray(books.entries) || !Array.isArray(books.parties) || !Array.isArray(books.products)) {
+    throw new Error("Invalid stored books");
   }
+  return books as Books;
+}
+
+// Checking for an existing record and importing legacy books share a
+// transaction. Two tabs starting together cannot replace one another's ledger.
+async function loadDeviceBooks(): Promise<Books> {
+  const db = await openDb();
+  const tx = db.transaction(STORE_NAME, "readwrite");
+  const records = tx.objectStore(STORE_NAME);
+  let migrated: Books;
+  try {
+    const current = await records.get(DB_KEY);
+    if (current !== undefined) return checkBooks(current);
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (raw === null) return emptyBooks();
+    migrated = checkBooks(JSON.parse(raw));
+    await records.add(migrated, DB_KEY);
+  } finally {
+    await tx.done;
+  }
+
+  try {
+    localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    // The committed IndexedDB record takes precedence on the next startup.
+  }
+  return migrated;
 }
 
 /* ------------------------------------------------------------------ */
@@ -147,6 +162,7 @@ interface HishabState {
   nav: Screen[];
   draft: Draft | null;
   ready: boolean;
+  startupFailed: boolean;
   onboarded: boolean;
   saved: boolean;
   toast: string | null;
@@ -183,6 +199,7 @@ function emptyBooks(): Books {
  * Persist writes are sequenced so a slower earlier write can never
  * overwrite a newer one (fire-and-forget from sync actions).
  */
+let startup: Promise<void> | undefined;
 let persistChain: Promise<unknown> = Promise.resolve();
 function persistSafe(books: Books): Promise<void> {
   persistChain = persistChain.then(() => persistDbBooks(books).catch(() => undefined));
@@ -197,29 +214,16 @@ export const useHishab = create<HishabState>((set, get) => ({
   onboarded: false,
   saved: true,
   toast: null,
-  hydrate: async () => {
-    if (get().ready) return;
-    let books = await readDbBooks();
-    let migrated = false;
-    if (!books) {
-      const legacy = readLegacyBooks();
-      if (legacy) {
-        books = legacy;
-        migrated = true;
-      } else {
-        books = emptyBooks();
-      }
-    }
-    const saved = await persistDbBooks(books);
-    if (migrated && saved) {
-      localStorage.removeItem(LEGACY_KEY);
-    }
-    set({
-      books,
-      ready: true,
-      saved,
-      onboarded: Boolean(books.businessName),
-    });
+  startupFailed: false,
+  hydrate: () => {
+    if (get().ready) return Promise.resolve();
+    if (startup) return startup;
+    startup = loadDeviceBooks()
+      .then((books) => set({ books, ready: true, saved: true, onboarded: Boolean(books.businessName) }))
+      .catch(() => set({ startupFailed: true }))
+      .finally(() => { startup = undefined; });
+    set({ startupFailed: false });
+    return startup;
   },
   goTab: (id) => set({ nav: [{ id }], draft: null }),
   push: (screen) => set({ nav: [...get().nav, screen] }),
