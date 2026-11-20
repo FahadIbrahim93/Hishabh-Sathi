@@ -27,6 +27,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-fund --no-audit
+      - name: Diagnose lockfile mismatch
+        if: failure()
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git diff -- package-lock.json
       - run: npm audit --audit-level=low
       - run: node scripts/check-auth-schema.mjs
         env:
