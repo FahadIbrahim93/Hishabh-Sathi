@@ -16,12 +16,12 @@ function file(name: string, statuses: Status[]) {
   };
 }
 
-/** A report that meets the floor: three browser specs plus filler unit tests. */
+/** A report that meets the floor: four browser specs plus filler unit tests. */
 function healthyReport(total = 110): unknown {
   return {
     testResults: [
-      file(browserFile, ["passed", "passed", "passed"]),
-      file(unitFile, Array(total - 3).fill("passed")),
+      file(browserFile, ["passed", "passed", "passed", "passed"]),
+      file(unitFile, Array(total - 4).fill("passed")),
     ],
   };
 }
@@ -34,7 +34,7 @@ describe("test gate", () => {
     expect(result.stats).toMatchObject({
       passed: 110,
       skipped: 0,
-      browserPassed: 3,
+      browserPassed: 4,
       minTests: 110,
     });
   });
@@ -62,14 +62,14 @@ describe("test gate", () => {
   it("fails when the suite shrank below the recorded baseline", () => {
     const report = {
       testResults: [
-        file(browserFile, ["passed", "passed", "passed"]),
+        file(browserFile, ["passed", "passed", "passed", "passed"]),
         file(unitFile, Array(100).fill("passed")),
       ],
     };
     const result = evaluateTestGate(report);
     expect(result.ok).toBe(false);
     expect(result.problems.join("\n")).toMatch(/at least 110/);
-    expect(result.stats.passed).toBe(103);
+    expect(result.stats.passed).toBe(104);
   });
 
   it("fails when a test failed", () => {
@@ -87,7 +87,7 @@ describe("test gate", () => {
   it("honours an explicit lower floor for smaller suites", () => {
     const report = {
       testResults: [
-        file(browserFile, ["passed", "passed", "passed"]),
+        file(browserFile, ["passed", "passed", "passed", "passed"]),
         file(unitFile, ["passed", "passed"]),
       ],
     };

@@ -1,3 +1,7 @@
+# Ledger verification · 21 November 2026
+
+#20 passed the [post-merge CI gate](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834750585). Issue #18 adds generated ledger, dues, consignment, rounding and Bangla parser checks. Historical money and reporting defects are tracked in #35–#39 and #41. Use actual hosted results for release decisions.
+
 # Ledger property tests checkpoint - 20 November 2026
 
 Issue #18. Branch `feat/ledger-property-tests`, stacked on `fix/ci-gate` (`9ed0c49`) so the new dev dependency sits under the audit gate recorded below.
@@ -32,64 +36,13 @@ The generators stay off paths 1 and 2, so the suite asserts guarantees instead o
 - Issue #18's acceptance criteria could not be read: `gh` is unauthenticated and the unauthenticated GitHub API was rate-limited. Scope comes from `CONTRIBUTING.md` ("ledger changes require property tests") and the roadmap entry.
 - The properties cover the engine. The device store and the UI keep their existing example-based and browser coverage.
 
-# Dependency audit gate checkpoint - 20 November 2026
+# Hosted CI gate · 21 November 2026
 
-Issue #20 continuation. Branch `fix/ci-gate`, on top of `7370ab7`.
+#15 merged via #34. Main passed [dependency and PostgreSQL verification](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834416515) and [CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834416531) on 55feee0. Issue #20 now enforces the lockfile, dependency audit and all four browser scenarios. The audit script lives in the same change as its workflow invocation.
 
-## What changed
+# Dependency verification · 21 November 2026
 
-- `npm run audit` runs `npm audit --audit-level=low`, npm's strictest threshold: any advisory at any severity fails. The tree is at zero, so the gate is a ratchet, not a new baseline.
-- The workflow runs that script in a `Dependency audit` step immediately after `npm ci` and before the browser provisioning, so a regression is reported in seconds instead of after several minutes of Chromium and font setup. `npm ci` keeps `--no-audit` so the audit is paid for once, in a named step.
-
-## Fresh-eyes review of the #20 workflow
-
-The review found one defect that would have failed every run, and one redundant step:
-
-- **Wrong apt package name.** Ubuntu 24.04 does not publish `fonts-lohit-bengali`; the package is `fonts-lohit-beng-bengali` (2.91.5-3, section main, verified on packages.ubuntu.com for noble). `apt-get install` would have exited 100 with "Unable to locate package" before any test ran. `fonts-noto-core` (20201225-2, main, provides Noto Sans Bengali) was already correct. The remediation text in `scripts/verify-browser-env.mjs` named the same non-existent package; it now names the real one.
-- **Redundant `apt-get update`.** The `npx playwright install --with-deps chromium` step immediately above installs apt packages and therefore refreshes the package lists in the same job, so the second update only re-downloaded the same indexes. The font step is now a single `apt-get install` with a comment explaining why it is safe.
-- Otherwise the step order was kept: install, audit, browser, fonts, environment check, typecheck, lint, tests, build. Each is a named step so a red run points at one thing.
-
-## Verification
-
-- Clean tree: `npm run audit` exit **0**, `found 0 vulnerabilities`.
-- Deliberate break, in a scratch directory outside the repo: a lockfile pinning `lodash@4.17.20` makes the same command exit **1** with `Severity: high`, so the step is a real gate and not a log line.
-- `.github/workflows/ci.yml` parsed with `js-yaml`: runner `ubuntu-24.04`, 11 steps in the intended order, the audit step's command is exactly `npm run audit`, and the font step installs the two confirmed packages.
-- Exact local CI order after a fresh `npm ci` (exit 0): `verify-browser-env` 0 - `audit` 0 - `typecheck` 0 - `lint` 0 (the same 3 pre-existing `react-refresh` warnings) - `test:ci` 0 (**122/122 tests in 15 files, 0 skipped, 3 browser specs**, gate line `test gate: ok ... (floor 110)`) - `build` 0 (`db:migrate` skipped, `DATABASE_URL` unset).
-
-## Not verifiable from this runner
-
-`sudo` is disabled here, so the two apt steps cannot run locally; both package names were confirmed against the Ubuntu package index instead. `gh` is unauthenticated, so no Actions run was observed and no PR was opened.
-
-# CI gate checkpoint - 20 November 2026
-
-Issue #20. Base commit `6c60ba2` (the pushed `fix/dependency-audit` branch), branch `fix/ci-gate`, deliberately stacked: CI must enforce the guarantee #15 was verified against, on the audited lockfile and the 110-test baseline.
-
-## What was wrong
-
-`.github/workflows/ci.yml` ran `npm install --no-audit --no-fund`, so the listen job did not prove the committed lockfile installs. It never installed a browser or fonts, relying on the runner image; the browser specs call `it.skipIf(!chrome && !process.env.CI)`, so any environment change could turn the durable-write evidence into a silent skip with a green job. `vercel.json` also pinned `npm install --omit=dev`, which omits `vite` and cannot build.
-
-## What changed
-
-- `npm ci --no-audit --no-fund` in CI and in `vercel.json` (strict, lockfile is the source of truth).
-- `runs-on: ubuntu-24.04` (pinned), `permissions: contents: read`, `concurrency`, `timeout-minutes: 25`, `CI=true` and `REQUIRE_BROWSER=1`.
-- `npx playwright install --with-deps chromium`: the Chromium revision is pinned by `package-lock.json`; `--with-deps` installs the shared libraries.
-- `sudo apt-get install fonts-noto-core fonts-lohit-bengali`: without a Bengali font Chromium lays Bangla out with zero glyphs and Playwright reports visible text as hidden.
-- New `scripts/verify-browser-env.mjs` runs before the suite: it checks the pinned binary exists, that `ldd` reports no unresolved library, and that a Bengali-capable font is resolvable, failing with an actionable message instead of a mystery timeout.
-- New `scripts/check-test-gate.mjs` plus `npm run test:ci`: reads the vitest JSON report and fails on any skipped/pending/todo test, any failure, a browser spec that did not run (or ran fewer than 3 cases), or fewer than 110 passing tests (`MIN_TESTS`).
-- `receipt.browser.test.ts` now uses `chrome || requireBrowser ? it : it.skip`, and throws a clear error if it is asked to run without a browser, so CI cannot skip it.
-- `src/lib/ci/test-gate.test.ts` covers the gate: skip detected, missing browser spec, shrunken suite, failures, empty report, custom floor.
-
-## Enforcement demonstrated
-
-With the browser spec excluded through a deliberately broken `vitest.config.ts`, `npm run test:ci` exited **1** with `test gate: FAILED - the browser spec receipt.browser.test.ts did not run at all`. The config was restored byte-for-byte and the same command exited **0**.
-
-## Verification (fresh dependency state, exact CI command order)
-
-`npm ci` **0** - `npx playwright install chromium` **0** - `node scripts/verify-browser-env.mjs` **0** - `npm run typecheck` **0** - `npm run lint` **0** (3 pre-existing `react-refresh` warnings) - `npm run test:ci` **0**, **117/117 tests in 14 files, 0 skipped, 3 browser specs executing (10.9s)**, gate line `test gate: ok - 117 passed, 0 failed, 0 skipped, 3 browser specs across 14 files (floor 110)` - `npm run build` **0** - `npm audit` **0**. The workflow YAML was parsed programmatically to confirm the step list, runner, permissions and that `npm ci` replaced `npm install`.
-
-## Not verifiable from this runner
-
-`gh` is unauthenticated, so no GitHub Actions run was observed and no PR could be opened; issue #20 cannot be closed here. `sudo` is disabled on this VM, so `npx playwright install --with-deps` and the `apt-get` font step cannot run locally: the local run used libraries and fonts provisioned beforehand (`/tmp/chromelibs` plus `LD_LIBRARY_PATH` and `FONTCONFIG_FILE`), while the workflow provisions them on the pinned Ubuntu image. The `vercel.json` change is unverified without a deploy.
+Catalog issue #32 and PR #33 merged. [Post-merge main CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44833849170) passed for 863149d. Current issue #15 requires a new hosted audit and an isolated PostgreSQL auth schema check. Verify merge CI before proceeding to #20.
 
 # Dependency audit checkpoint - 20 November 2026
 
@@ -120,6 +73,12 @@ Moderates and lows closed the same way: `@typescript-eslint/*` and `typescript-e
 - `gh` is unauthenticated in this runner, so issue #15 has to be closed by a maintainer once this draft branch is reviewed; nothing was merged or deployed.
 - Better Auth 1.7 may expect a newer auth schema than `migrations/auth/0001_auth.sql`. Sign-in is off in the shipped config and `DATABASE_URL` is unset locally, so no check here exercises it: regenerate that schema with the Better Auth CLI before enabling sign-in in a deployed environment.
 - CI still installs with `npm install` instead of `npm ci` (#20) and relies on the runner image for Chrome and fonts; the browser specs skip silently if either is missing.
+
+# Delivery integration · 21 November 2026
+
+Work from Hishabh-Sathi. The earlier main checkpoint at 77c1218 passed [all 106 tests, typecheck, lint and build](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44747694855). The legacy VB-001 audit and VB-002 research remain inputs, VB-003 through VB-008 map to the active UI, ledger, offline and sync work, VB-009 is the field pilot and VB-010 is private-repo governance. Keep the long-term stack, hosting and licence decisions on #19.
+
+Current work: #32 / #33. Hold catalog publication and success feedback until IndexedDB commits. Retain failed form input and verify stale-tab mode changes after a collection. Verify PR and merged-main CI separately. Follow with #15, #20, #18 and #16 in order.
 
 # Integration checkpoint - 20 November 2026
 

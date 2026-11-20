@@ -13,10 +13,13 @@ import {
   buildReturn,
   buildReversal,
   buildSale,
+  duesAging,
   reversalFor,
   stockAt,
   stockTotal,
 } from "./engine.ts";
+import { formatTaka, toBnDigits, takaToPaisa, parseAmount } from "./money.ts";
+import { parseUtterance } from "./parser.ts";
 import { makeSeed } from "./seed.ts";
 import {
   WAREHOUSE,
@@ -868,5 +871,58 @@ describe("ledger invariants over generated operations", () => {
     expect(() =>
       apply(once, buildReversal({ id: "flip", at: AT, original: correction, reason: "x" })),
     ).toThrow();
+  });
+});
+
+describe("merchant-facing ledger invariants", () => {
+  it("never turns a consignment delivery into revenue or customer debt", () => {
+    fc.assert(fc.property(catalogArb, catalog => {
+      const books = openingBooks(catalog);
+      const held = apply(books, buildConsign(books, {
+        id: "delivery", at: AT, partyId: "c1", productId: "p1", qty: catalog.qty1,
+      }));
+      expect(balance(held, "revenue")).toBe(balance(books, "revenue"));
+      expect(balance(held, "receivable", "c1")).toBe(balance(books, "receivable", "c1"));
+      expect(stockAt(held, "p1", partyLoc("c1"))).toBe(catalog.qty1);
+    }));
+  });
+  it("reconciles the three age buckets across independent customer balances", () => {
+    fc.assert(fc.property(catalogArb, fc.integer({min:1, max:45}), (catalog, days) => {
+      let books = openingBooks(catalog);
+      const now = AT + days * 86400000;
+      for (const [index, partyId] of ["c1", "c2"].entries()) {
+        books = apply(books, buildSale(books, {
+          id: "bill-" + partyId, at: index === 0 ? AT : now, partyId,
+          totalPaisa: (index + 1) * catalog.price1, receivedPaisa: 0,
+        }));
+      }
+      const bins = duesAging(books, now);
+      const bucket = days <= 7 ? "0-7" : days <= 30 ? "8-30" : "30+";
+      expect(bins.find(row => row.partyId === "c1")?.bucket).toBe(bucket);
+      const total = bins.reduce((sum, row) => sum + row.receivable, 0);
+      expect(total).toBe(balance(books, "receivable"));
+    }));
+  });
+  it("reads Bangla and English collection amounts identically", () => {
+    const books = makeSeed();
+    fc.assert(fc.property(fc.integer({min:1, max:9000}), amount => {
+      const phrase = (value: string) => "করিমের কাছ থেকে " + value + " টাকা পেয়েছি";
+      const english = parseUtterance(phrase(String(amount)), books);
+      const bangla = parseUtterance(phrase(toBnDigits(String(amount))), books);
+      expect(english.kind).toBe("collection");
+      expect(english.amountTaka).toBe(amount);
+      expect(bangla).toEqual(english);
+    }));
+  });
+  it("displays amounts on either side of a half-paisa rounding boundary", () => {
+    fc.assert(fc.property(fc.integer({min: 1, max: 1000000}), paisa => {
+      expect(formatTaka(paisa + 0.49)).toBe(formatTaka(paisa));
+      expect(formatTaka(paisa + 0.5)).toBe(formatTaka(paisa + 1));
+    }));
+  });
+  it("retains exact whole-taka values at the money input boundary", () => {
+    fc.assert(fc.property(fc.integer({min:0,max:1000000}), taka => {
+      expect(takaToPaisa(parseAmount(toBnDigits(String(taka))))).toBe(taka * 100);
+    }));
   });
 });

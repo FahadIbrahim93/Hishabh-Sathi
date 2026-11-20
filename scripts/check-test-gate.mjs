@@ -24,7 +24,7 @@ import { pathToFileURL } from "node:url";
 
 export const DEFAULT_MIN_TESTS = 110;
 export const BROWSER_SPEC = "receipt.browser.test.ts";
-export const MIN_BROWSER_TESTS = 3;
+export const MIN_BROWSER_TESTS = 4;
 
 /**
  * @typedef {{ fullName?: string, title?: string, status?: string }} RawAssertion
