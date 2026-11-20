@@ -1,9 +1,17 @@
 # Hishab Sathi engineering session
 
 **20 November 2026 · Dhaka**
+## Merge review · 20 November 2026
+
+**Completed.** Reviewed and merged [#24](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/24) at [6d44c5e](https://github.com/FahadIbrahim93/Hishabh-Sathi/commit/6d44c5e08b6302cd0c862fee950e85497ec020c4), then [#26](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/26) at [d11f5ed](https://github.com/FahadIbrahim93/Hishabh-Sathi/commit/d11f5ed5924fd319a9f7eac12215614b10775d02). The branches had no unresolved review threads. The final merged file tree matched the reviewed startup PR. GitHub closed issues #23 and #25.
+
+**Verification.** Typecheck, lint, tests and build passed on both merge commits. The integrated suite passed 85 tests, including the Chrome retry and reload checks. [Receipt merge CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44741139665) · [Startup merge CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44741219243)
+
+**Next task, awaiting approval.** Validate manual backup restore before it can replace existing books. Reject malformed or unbalanced entries, preserve the current ledger through reload, and verify that valid backups still restore.
+
 ## Startup recovery · 20 November 2026
 
-**Current task** — Startup recovery is implemented and tested in [draft PR #26](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/26), built on [receipt PR #24](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/24). Both await review. [Startup-only diff](https://github.com/FahadIbrahim93/Hishabh-Sathi/compare/fix/receipt-durability...fix/startup-recovery)
+**Review status** — Merged in [PR #26](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/26) after the receipt fix.
 
 **Completed.** Startup now distinguishes a missing record from a failed read. If IndexedDB cannot read the books, the app shows “হিসাব খোলা যায়নি” and a retry button, keeps onboarding closed, and issues zero ledger writes. A successful read of existing books also issues zero writes. A genuinely new device still reaches onboarding. Concurrent startup calls share one read. Migration retains the legacy copy until the IndexedDB transaction commits.
 
@@ -13,7 +21,7 @@
 
 ## Receipt durability · 20 November 2026
 
-**Review status** — Await review of [draft PR #24](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/24), which addresses [issue #23](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/23). The implementation and regression tests are on the PR branch. Merging requires owner approval.
+**Review status** — Merged in [PR #24](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/24), closing [issue #23](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/23).
 
 **Completed.** The shared entry confirmation flow now waits for the IndexedDB transaction to commit before changing the balance, clearing the draft or showing a receipt. A failed write leaves the shop and amount available for retry and displays a Bangla error. Repeated taps on the same pending entry share one save. A confirmation based on older books is rejected if the device copy has changed.
 
