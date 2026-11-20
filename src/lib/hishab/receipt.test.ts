@@ -64,12 +64,15 @@ describe("durable collection receipts", () => {
     const first = useHishab.getState().commitEntry(entry);
     const second = useHishab.getState().commitEntry(entry);
     await vi.waitFor(() => expect(puts).toBeGreaterThan(0));
-    const pending = useHishab.getState();
-    expect(pending.nav.at(-1)?.id).toBe("flow");
-    expect(pending.draft).toEqual(draft);
-    expect(due(pending.books)).toBe(before);
-    expect(pending.toast).not.toBe("হিসাব সেভ হয়েছে");
-    gate.resolve();
+    try {
+      const pending = useHishab.getState();
+      expect(pending.nav.at(-1)?.id).toBe("flow");
+      expect(pending.draft).toEqual(draft);
+      expect(due(pending.books)).toBe(before);
+      expect(pending.toast).not.toBe("হিসাব সেভ হয়েছে");
+    } finally {
+      gate.resolve();
+    }
     await Promise.all([first, second]);
     expect(puts).toBe(1);
     expect(useHishab.getState().nav.filter(s => s.id === "receipt")).toHaveLength(1);
