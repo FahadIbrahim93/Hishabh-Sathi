@@ -115,3 +115,27 @@ describe("durable collection receipts", () => {
     expect(useHishab.getState().draft).toEqual(draft);
   });
 });
+
+it("shares a pending reversal, publishes it after commit and refuses another after reload", async () => {
+  const entry = collection();
+  const { commitEntry, reverseEntry } = useHishab.getState();
+  await commitEntry(entry);
+  const gate = deferred();
+  completion = gate.promise;
+  const first = reverseEntry(entry.id, "ভুল অঙ্ক");
+  const second = reverseEntry(entry.id, "আবার চাপ");
+  try {
+    await vi.waitFor(() => expect(puts).toBe(2)); // One collection and one correction.
+    expect(due(useHishab.getState().books)).toBe(740_000);
+    expect(due(disk)).toBe(740_000);
+  } finally {
+    gate.resolve();
+  }
+  await Promise.all([first, second]);
+  useHishab.setState(initial, true);
+  await useHishab.getState().hydrate();
+  await expect(reverseEntry(entry.id, "আবার চাপ")).rejects.toThrow(/আগেই বিলোপ/);
+  expect(puts).toBe(2);
+  expect(due(disk)).toBe(800_000);
+  expect(disk.entries.filter(row => row.reversesEntryId === entry.id)).toHaveLength(1);
+});

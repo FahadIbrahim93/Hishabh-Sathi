@@ -161,3 +161,50 @@ browserTest("rejects a damaged file, keeps the live ledger on write failure, and
   expect(await reopen()).toBe(backup);
   expect(await page.evaluate("window.readReceiptBooks()")).toEqual({ entries: 0, due: 800_000 });
 }), 90_000);
+
+browserTest("retries a failed reversal and prevents another tab from doubling it", () => withReceiptPage(async page => {
+  await page.getByRole("button", { name: "সেভ করুন", exact: true }).click();
+  await page.locator('[data-screen="receipt"]').waitFor();
+  const exported: string = await page.evaluate("window.exportTestBooks()");
+  const payment = (JSON.parse(exported) as import("./types.ts").Books).entries.at(-1)!;
+  const openPayment = async (tab: Page) => {
+    await tab.reload();
+    await tab.locator('[data-screen="home"]').waitFor();
+    await tab.getByText(payment.summary, { exact: true }).click();
+  };
+  const reason = (tab: Page) => tab.getByPlaceholder("কেন বিলোপ করছেন?");
+  const reverse = (tab: Page) => tab.getByRole("button", { name: "বিলোপ করুন", exact: true });
+  await openPayment(page);
+  const stale = await page.context().newPage();
+  await stale.goto(page.url());
+  await openPayment(stale);
+  await reason(stale).fill("দ্বিতীয় ট্যাব");
+  await reason(page).fill("ভুল অঙ্ক");
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...args) {
+      IDBObjectStore.prototype.put = put;
+      const request = put.apply(this, args);
+      this.transaction.abort();
+      return request;
+    };
+  });
+  await reverse(page).click();
+  await page.getByRole("alert").filter({ hasText: "সেভ হয়নি" }).waitFor();
+  expect(await reason(page).inputValue()).toBe("ভুল অঙ্ক");
+  expect(await page.evaluate("window.exportTestBooks()")).toBe(exported);
+  await reverse(page).click();
+  await page.locator('[data-screen="home"]').waitFor();
+  await reverse(stale).click();
+  await stale.getByRole("alert").filter({ hasText: "হিসাব বদলেছে" }).waitFor();
+  for (const tab of [stale, page]) {
+    await openPayment(tab);
+    await tab.getByText("এই হিসাব আগেই বিলোপ করা হয়েছে।", { exact: true }).waitFor();
+    expect(await reverse(tab).count()).toBe(0);
+    const raw: string = await tab.evaluate("window.exportTestBooks()");
+    const restored = JSON.parse(raw) as import("./types.ts").Books;
+    const linked = restored.entries.filter(row => row.reversesEntryId === payment.id);
+    expect(linked.map(row => row.meta.reason)).toEqual(["ভুল অঙ্ক"]);
+    expect(await tab.evaluate("window.readReceiptBooks()")).toEqual({ entries: 1, due: 800_000 });
+  }
+}), 90_000);

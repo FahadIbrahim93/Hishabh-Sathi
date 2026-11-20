@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Callout, Choice, Page, Primary, ScreenHeader, Secondary, TextField } from "@/components/hishab/bits";
 import { beginDraft } from "@/components/hishab/flows";
-import { audit, balance, collectedBetween, explain, productsAt, revenueBetween, stockAt } from "@/lib/hishab/engine";
+import { audit, balance, collectedBetween, explain, productsAt, revenueBetween, reversalFor, stockAt } from "@/lib/hishab/engine";
 import { formatQty, formatTaka, formatWhen, parseAmount, startOfLocalDay } from "@/lib/hishab/money";
 import { draftFromParse, parseUtterance, SAMPLES } from "@/lib/hishab/parser";
 import { firstGap } from "@/lib/hishab/flow";
@@ -605,15 +605,15 @@ export function EntryScreen({ entryId }: { entryId: string }) {
     );
   }
   const view = explain(books, entry);
-  const canReverse =
-    entry.kind !== "opening" && entry.kind !== "reversal";
+  const correction = reversalFor(books, entry.id);
+  const canReverse = entry.kind !== "opening" && entry.kind !== "reversal" && !correction;
 
-  const doReverse = () => {
+  const doReverse = async () => {
     if (reversing || !reason.trim()) return;
     setReversing(true);
     setError("");
     try {
-      reverseEntry(entry.id, reason.trim());
+      await reverseEntry(entry.id, reason.trim());
       setReason("");
       back();
     } catch (err) {
@@ -639,6 +639,7 @@ export function EntryScreen({ entryId }: { entryId: string }) {
           ))}
         </div>
         {view.foot ? <Callout title="মনে রাখবেন" body={view.foot} /> : null}
+        {correction ? <p role="status">এই হিসাব আগেই বিলোপ করা হয়েছে।</p> : null}
         {canReverse ? (
           <div className="mt-5 space-y-3">
             <TextField
@@ -652,7 +653,7 @@ export function EntryScreen({ entryId }: { entryId: string }) {
                 বিলোপ করুন
               </Primary>
             </div>
-            {error ? <p className="text-sm text-clay">{error}</p> : null}
+            {error ? <p role="alert" className="text-sm text-clay">{error}</p> : null}
           </div>
         ) : null}
       </Page>

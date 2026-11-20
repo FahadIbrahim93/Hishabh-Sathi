@@ -47,6 +47,7 @@ function checkReferences(books: Books) {
   const locations = new Set([WAREHOUSE, ...Array.from(parties, partyLoc)]);
   const seen = new Map<string, Books["entries"][number]>();
 
+  const reversed = new Set<string>();
   for (const row of books.entries) {
     if (seen.has(row.id)) throw new BooksError("ব্যাকআপে একই হিসাব একাধিকবার আছে।");
     const missingParty = row.partyId !== undefined && !parties.has(row.partyId);
@@ -59,6 +60,13 @@ function checkReferences(books: Books) {
       : row.reversesEntryId !== undefined;
     if (missingParty || missingProduct || badLine || badMove || badReversal) {
       throw new BooksError("ব্যাকআপের হিসাবের সঙ্গে দোকান, পণ্য বা আগের হিসাবের মিল নেই।");
+    }
+    if (row.reversesEntryId) {
+      const original = seen.get(row.reversesEntryId)!;
+      if (reversed.has(original.id) || original.kind === "opening" || original.kind === "reversal") {
+        throw new BooksError("ব্যাকআপে এই হিসাবের বিলোপ গ্রহণযোগ্য নয়।");
+      }
+      reversed.add(original.id);
     }
     const stockOnly = row.kind === "consign" ||
       (row.kind === "return" && row.meta.returnMode === "consign") ||
