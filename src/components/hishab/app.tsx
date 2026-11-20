@@ -27,6 +27,7 @@ const TABS: { id: TabId; label: string; icon: typeof Home }[] = [
 
 export function HishabApp() {
   const ready = useHishab((s) => s.ready);
+  const startupFailed = useHishab((s) => s.startupFailed);
   const onboarded = useHishab((s) => s.onboarded);
   useEffect(() => {
     useHishab.getState().hydrate();
@@ -37,9 +38,25 @@ export function HishabApp() {
       <Aside />
       <div className="flex h-dvh w-full min-w-0 flex-col bg-paper lg:flex-1">
         <div className="mx-auto flex h-full w-full max-w-md flex-col">
-          {!ready ? <Splash /> : onboarded ? <Shell /> : <OnboardingScreen />}
+          {startupFailed ? <StartupRecovery /> : !ready ? <Splash /> : onboarded ? <Shell /> : <OnboardingScreen />}
         </div>
       </div>
+    </div>
+  );
+}
+
+function StartupRecovery() {
+  const retry = useHishab((s) => s.hydrate);
+  return (
+    <div className="m-auto space-y-4 px-6">
+      <div role="alert">
+        <h1 className="font-display text-2xl font-semibold text-ink">হিসাব খোলা যায়নি</h1>
+        <p className="mt-2 text-ink-soft">এই ফোনের হিসাব পড়া যায়নি। আবার চেষ্টা করুন।</p>
+      </div>
+      <button type="button" onClick={() => void retry()}
+        className="min-h-12 rounded-xl bg-palm px-5 font-semibold text-paper">
+        আবার চেষ্টা করুন
+      </button>
     </div>
   );
 }
