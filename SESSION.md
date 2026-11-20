@@ -1,3 +1,9 @@
+# Delivery integration · 21 November 2026
+
+Work from Hishabh-Sathi. The earlier main checkpoint at 77c1218 passed [all 106 tests, typecheck, lint and build](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44747694855). The legacy VB-001 audit and VB-002 research remain inputs, VB-003 through VB-008 map to the active UI, ledger, offline and sync work, VB-009 is the field pilot and VB-010 is private-repo governance. Keep the long-term stack, hosting and licence decisions on #19.
+
+Current work: #32 / #33. Hold catalog publication and success feedback until IndexedDB commits. Retain failed form input and verify stale-tab mode changes after a collection. Verify PR and merged-main CI separately. Follow with #15, #20, #18 and #16 in order.
+
 # Integration checkpoint - 20 November 2026
 
 **Post-merge verification of `main` after PR #29 and PR #31: COMPLETED.**
