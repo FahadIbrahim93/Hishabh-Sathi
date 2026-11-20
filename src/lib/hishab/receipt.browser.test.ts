@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { chromium, type Page } from "playwright";
 import { createServer } from "vite";
 import { expect, it } from "vitest";
+import type { Books } from "./types.ts";
 
 // GitHub's Ubuntu runner supplies Chrome. Local runs can use Playwright Chromium.
 const chrome = [process.env.CHROME_BIN, "/usr/bin/google-chrome", chromium.executablePath()]
@@ -57,7 +58,8 @@ async function withReceiptPage(run: (page: Page) => Promise<void>) {
     await server.listen();
     const browser = await chromium.launch({ executablePath: chrome });
     try {
-      const page = await browser.newPage();
+      const context = await browser.newContext();
+      const page = await context.newPage();
       await page.goto(new URL("/receipt-test", server.resolvedUrls!.local[0]).href);
       await run(page);
     } finally {
@@ -160,4 +162,51 @@ browserTest("rejects a damaged file, keeps the live ledger on write failure, and
   await page.getByText("ব্যাকআপ ফেরত আনা হয়েছে", { exact: true }).waitFor();
   expect(await reopen()).toBe(backup);
   expect(await page.evaluate("window.readReceiptBooks()")).toEqual({ entries: 0, due: 800_000 });
+}), 90_000);
+
+browserTest("retries a failed reversal and prevents another tab from doubling it", () => withReceiptPage(async page => {
+  await page.getByRole("button", { name: "সেভ করুন", exact: true }).click();
+  await page.locator('[data-screen="receipt"]').waitFor();
+  const exported: string = await page.evaluate("window.exportTestBooks()");
+  const payment = (JSON.parse(exported) as Books).entries.at(-1)!;
+  const openPayment = async (tab: Page) => {
+    await tab.reload();
+    await tab.locator('[data-screen="home"]').waitFor();
+    await tab.getByText(payment.summary, { exact: true }).click();
+  };
+  const reason = (tab: Page) => tab.getByPlaceholder("কেন বিলোপ করছেন?");
+  const reverse = (tab: Page) => tab.getByRole("button", { name: "বিলোপ করুন", exact: true });
+  await openPayment(page);
+  const stale = await page.context().newPage();
+  await stale.goto(page.url());
+  await openPayment(stale);
+  await reason(stale).fill("দ্বিতীয় ট্যাব");
+  await reason(page).fill("ভুল অঙ্ক");
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...args) {
+      IDBObjectStore.prototype.put = put;
+      const request = put.apply(this, args);
+      this.transaction.abort();
+      return request;
+    };
+  });
+  await reverse(page).click();
+  await page.getByRole("alert").filter({ hasText: "সেভ হয়নি" }).waitFor();
+  expect(await reason(page).inputValue()).toBe("ভুল অঙ্ক");
+  expect(await page.evaluate("window.exportTestBooks()")).toBe(exported);
+  await reverse(page).click();
+  await page.locator('[data-screen="home"]').waitFor();
+  await reverse(stale).click();
+  await stale.getByRole("alert").filter({ hasText: "হিসাব বদলেছে" }).waitFor();
+  for (const tab of [stale, page]) {
+    await openPayment(tab);
+    await tab.getByText("এই হিসাব আগেই বিলোপ করা হয়েছে।", { exact: true }).waitFor();
+    expect(await reverse(tab).count()).toBe(0);
+    const raw: string = await tab.evaluate("window.exportTestBooks()");
+    const restored = JSON.parse(raw) as Books;
+    const linked = restored.entries.filter(row => row.reversesEntryId === payment.id);
+    expect(linked.map(row => row.meta.reason)).toEqual(["ভুল অঙ্ক"]);
+    expect(await tab.evaluate("window.readReceiptBooks()")).toEqual({ entries: 1, due: 800_000 });
+  }
 }), 90_000);

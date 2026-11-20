@@ -185,7 +185,8 @@ interface HishabState {
   setMode: (mode: Mode) => void;
   setOnboarded: (value: boolean) => void;
   createBusiness: (name: string, cashPaisa: number) => Promise<void>;
-  reverseEntry: (entryId: string, reason: string) => void;
+  pendingReversal: { originalId: string; done: Promise<void> } | null;
+  reverseEntry: (entryId: string, reason: string) => Promise<void>;
   exportBooks: () => string;
   restoring: boolean;
   importBooks: (source: string | Blob) => Promise<void>;
@@ -254,7 +255,8 @@ export const useHishab = create<HishabState>((set, get) => ({
   },
   pendingReceipt: null,
   commitEntry: async (entry) => {
-    const { pendingReceipt, books: previous } = get();
+    const { pendingReceipt, pendingReversal, restoring, books: previous } = get();
+    if (pendingReversal || restoring) throw new BooksError("হিসাব সেভ হচ্ছে। একটু পরে চেষ্টা করুন।");
     if (pendingReceipt) {
       if (pendingReceipt.entryId === entry.id) return pendingReceipt.done;
       throw new BooksError("আগের হিসাব সেভ হচ্ছে। একটু অপেক্ষা করুন।");
@@ -385,13 +387,15 @@ export const useHishab = create<HishabState>((set, get) => ({
     set({ books: opened, onboarded: true, saved: true });
     await persistSafe(opened);
   },
-  reverseEntry: (entryId: string, reason: string) => {
-    const books = get().books;
+  pendingReversal: null,
+  reverseEntry: async (entryId, reason) => {
+    const { books, pendingReversal, pendingReceipt, restoring } = get();
+    if (pendingReversal?.originalId === entryId) return pendingReversal.done;
+    if (pendingReversal || pendingReceipt || restoring) {
+      throw new BooksError("হিসাব সেভ হচ্ছে। একটু পরে চেষ্টা করুন।");
+    }
     const original = books.entries.find((e) => e.id === entryId);
     if (!original) throw new Error("হিসাব পাওয়া যায়নি।");
-    if (original.kind === "opening" || original.kind === "reversal") {
-      throw new Error("এই হিসাব বিলোপ করা যায় না।");
-    }
     const trimmed = reason.trim();
     if (!trimmed) throw new Error("বিলোপের কারণ লিখুন।");
     const reversal = buildReversal({
@@ -401,18 +405,21 @@ export const useHishab = create<HishabState>((set, get) => ({
       reason: trimmed,
     });
     const next = apply(books, reversal);
-    set({ books: next, saved: true, toast: "হিসাব বিলোপ করা হয়েছে" });
-    persistSafe(next).catch(() =>
-      set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }),
-    );
+    const done = persistChain.then(async () => {
+      await writeConfirmedBooks(books, next);
+      set({ books: next, saved: true, toast: "হিসাব বিলোপ করা হয়েছে" });
+    }).finally(() => set({ pendingReversal: null }));
+    persistChain = done.catch(() => undefined);
+    set({ pendingReversal: { originalId: entryId, done }, toast: null });
+    return done;
   },
   exportBooks: () => {
     return JSON.stringify(get().books, null, 2);
   },
   restoring: false,
   importBooks: async (source) => {
-    const { books: previous, restoring, pendingReceipt } = get();
-    if (restoring || pendingReceipt) throw new BooksError("হিসাব সেভ হচ্ছে। একটু পরে চেষ্টা করুন।");
+    const { books: previous, restoring, pendingReceipt, pendingReversal } = get();
+    if (restoring || pendingReceipt || pendingReversal) throw new BooksError("হিসাব সেভ হচ্ছে। একটু পরে চেষ্টা করুন।");
     set({ restoring: true, toast: null });
     try {
       const raw = typeof source === "string" ? source : await source.text().catch(() => {

@@ -219,8 +219,19 @@ function line(account: Account, debit: number, credit: number, partyId?: string)
   return row;
 }
 
+export function reversalFor(books: Books, originalId: string): Entry | undefined {
+  return books.entries.find(entry => entry.kind === "reversal" && entry.reversesEntryId === originalId);
+}
+
 export function apply(books: Books, entry: Entry): Books {
   if (books.entries.some((existing) => existing.id === entry.id)) return books;
+  if (entry.kind === "reversal") {
+    const original = books.entries.find(row => row.id === entry.reversesEntryId);
+    if (!original || original.kind === "opening" || original.kind === "reversal") {
+      throw new BooksError("এই হিসাব বিলোপ করা যায় না।");
+    }
+    if (reversalFor(books, original.id)) throw new BooksError("এই হিসাব আগেই বিলোপ করা হয়েছে।");
+  }
   finish(entry);
   for (const move of entry.stock) {
     if (move.qtyDelta < 0) {
