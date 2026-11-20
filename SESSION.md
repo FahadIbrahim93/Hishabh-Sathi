@@ -1,3 +1,7 @@
+# Dependency verification · 21 November 2026
+
+Catalog issue #32 and PR #33 merged. [Post-merge main CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44833849170) passed for 863149d. Current issue #15 requires a new hosted audit and an isolated PostgreSQL auth schema check. Verify merge CI before proceeding to #20.
+
 # Dependency audit checkpoint - 20 November 2026
 
 Issue #15. `npm audit` on the lockfile before this branch: **15 advisories - 3 critical, 1 high, 9 moderate, 2 low**. After: **0 - `found 0 vulnerabilities`, exit 0**. Base commit `5445b6a` (stacked on the catalog durability draft), branch `fix/dependency-audit`.
@@ -27,6 +31,12 @@ Moderates and lows closed the same way: `@typescript-eslint/*` and `typescript-e
 - `gh` is unauthenticated in this runner, so issue #15 has to be closed by a maintainer once this draft branch is reviewed; nothing was merged or deployed.
 - Better Auth 1.7 may expect a newer auth schema than `migrations/auth/0001_auth.sql`. Sign-in is off in the shipped config and `DATABASE_URL` is unset locally, so no check here exercises it: regenerate that schema with the Better Auth CLI before enabling sign-in in a deployed environment.
 - CI still installs with `npm install` instead of `npm ci` (#20) and relies on the runner image for Chrome and fonts; the browser specs skip silently if either is missing.
+
+# Delivery integration · 21 November 2026
+
+Work from Hishabh-Sathi. The earlier main checkpoint at 77c1218 passed [all 106 tests, typecheck, lint and build](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44747694855). The legacy VB-001 audit and VB-002 research remain inputs, VB-003 through VB-008 map to the active UI, ledger, offline and sync work, VB-009 is the field pilot and VB-010 is private-repo governance. Keep the long-term stack, hosting and licence decisions on #19.
+
+Current work: #32 / #33. Hold catalog publication and success feedback until IndexedDB commits. Retain failed form input and verify stale-tab mode changes after a collection. Verify PR and merged-main CI separately. Follow with #15, #20, #18 and #16 in order.
 
 # Integration checkpoint - 20 November 2026
 

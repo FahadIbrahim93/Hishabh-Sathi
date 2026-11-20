@@ -210,3 +210,22 @@ browserTest("retries a failed reversal and prevents another tab from doubling it
     expect(await tab.evaluate("window.readReceiptBooks()")).toEqual({ entries: 1, due: 800_000 });
   }
 }), 90_000);
+
+browserTest("keeps a newer collection when a stale tab changes the book mode", () => withReceiptPage(async page => {
+  const confirm = page.getByRole("button", { name: "সেভ করুন", exact: true });
+  await confirm.waitFor();
+  const stale = await page.context().newPage();
+  await stale.goto(page.url());
+  await stale.getByRole("button", { name: "সেভ করুন", exact: true }).waitFor();
+  await stale.reload();
+  await stale.getByRole("button", { name: "আরও", exact: true }).click();
+  await confirm.click();
+  await page.locator('[data-screen="receipt"]').waitFor();
+  const expected = await page.evaluate("window.exportTestBooks()");
+  await stale.getByRole("button", { name: /সহজ খাতা/ }).click();
+  await stale.getByText("হিসাব বদলেছে। আবার খুলে পাওনা মিলিয়ে নিন।", { exact: true }).waitFor();
+  await stale.reload();
+  await stale.locator('[data-screen="home"]').waitFor();
+  expect(await stale.evaluate("window.exportTestBooks()")).toBe(expected);
+  expect(await stale.evaluate("window.readReceiptBooks()")).toEqual({ entries: 1, due: 740_000 });
+}), 90_000);

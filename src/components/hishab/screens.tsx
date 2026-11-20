@@ -304,7 +304,7 @@ export function StockScreen() {
             <TextField label="এখন গুদামে কত পিস" value={qty} onChange={setQty} />
             {error ? <Callout tone="warn" title="হয়নি" body={error} /> : null}
             <Primary
-              onClick={() => {
+              onClick={async () => {
                 const size = parseAmount(packSize);
                 const priceTaka = parseAmount(price);
                 const costTaka = parseAmount(cost);
@@ -322,7 +322,7 @@ export function StockScreen() {
                   return;
                 }
                 try {
-                  addProduct({
+                  await addProduct({
                     name,
                     packName: size > 1 ? "কেস" : "পিস",
                     packSize: size,
@@ -435,13 +435,13 @@ export function MoreScreen() {
           title="সহজ খাতা"
           detail="বিক্রি, টাকা, খরচ। মালের তালিকা ছাড়াই।"
           selected={books.mode === "khata"}
-          onClick={() => setMode("khata")}
+          onClick={() => { void setMode("khata").catch(() => undefined); }}
         />
         <Choice
           title="মাল ও বিতরণ"
           detail="কেস, গুদাম, দোকানে রাখা মাল।"
           selected={books.mode === "stock"}
-          onClick={() => setMode("stock")}
+          onClick={() => { void setMode("stock").catch(() => undefined); }}
         />
         <Secondary onClick={() => open("expense")}>খরচ করেছি</Secondary>
         <Secondary onClick={() => push({ id: "report" })}>পুরো হিসাব</Secondary>
@@ -456,8 +456,7 @@ export function MoreScreen() {
               setArm(true);
               return;
             }
-            resetDemo();
-            setArm(false);
+            void resetDemo().then(() => setArm(false)).catch(() => undefined);
           }}
           className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-card font-display text-base font-semibold text-clay ring-1 ring-line"
         >
