@@ -14,6 +14,7 @@ const fixture = `<html lang="bn"><body><div id="root"></div><script type="module
   import {HishabApp} from "/src/components/hishab/app.tsx";
   import {useHishab} from "/src/lib/hishab/store.ts";
   import {makeSeed} from "/src/lib/hishab/seed.ts";
+  import {balance} from "/src/lib/hishab/engine.ts";
   import {blankDraft} from "/src/lib/hishab/flow.ts";
   const firstVisit = !sessionStorage.getItem("seeded");
   if (firstVisit) localStorage.setItem("hishab-sathi-v1", JSON.stringify(makeSeed()));
@@ -24,6 +25,13 @@ const fixture = `<html lang="bn"><body><div id="root"></div><script type="module
       step: "confirm", partyId: "rahim", amountTaka: 600
     }));
   }
+  window.readReceiptBooks = () => {
+    const books = useHishab.getState().books;
+    return {
+      entries: books.entries.filter(entry => entry.kind === "collection").length,
+      due: balance(books, "receivable", "rahim")
+    };
+  };
   createRoot(document.getElementById("root")).render(createElement(HishabApp));
 </script></body></html>`;
 
@@ -68,15 +76,7 @@ it.skipIf(!chrome && !process.env.CI)("retries an aborted device write from the 
       await page.locator('[data-screen="receipt"]').waitFor();
       await page.reload();
       await page.locator('[data-screen="home"]').waitFor();
-      const result = await page.evaluate(async ([storePath, enginePath]) => {
-        const { useHishab } = await import(storePath);
-        const { balance } = await import(enginePath);
-        const books = useHishab.getState().books;
-        return {
-          entries: books.entries.filter((e: { kind: string }) => e.kind === "collection").length,
-          due: balance(books, "receivable", "rahim"),
-        };
-      }, ["/src/lib/hishab/store.ts", "/src/lib/hishab/engine.ts"]);
+      const result = await page.evaluate("window.readReceiptBooks()");
       // Seeded Rahim owes ৳8,000. One ৳600 payment leaves ৳7,400.
       expect(result).toEqual({ entries: 1, due: 740_000 });
     } finally {
