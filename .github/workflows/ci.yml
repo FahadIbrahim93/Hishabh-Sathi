@@ -22,8 +22,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
+      # GitHub sets CI=true itself; REQUIRE_BROWSER is what the browser spec
+      # reads to refuse a silent skip, so both are stated explicitly here.
       CI: "true"
-      # A missing browser must fail the job instead of skipping the specs.
       REQUIRE_BROWSER: "1"
     steps:
       - uses: actions/checkout@v4
@@ -35,9 +36,17 @@ jobs:
           cache: npm
 
       # Strict install: the committed lockfile is the source of truth, so a
-      # registry drift or a stale lockfile fails here instead of shipping.
+      # registry drift or a stale lockfile fails here instead of shipping. The
+      # audit below is its own step, so it is not paid for twice here.
       - name: Install dependencies (from the committed lockfile)
         run: npm ci --no-audit --no-fund
+
+      # Security gate: the dependency tree is at zero advisories, and this fails
+      # the moment that stops being true, dev-only findings included (the last
+      # critical was a dev transitive). It runs before browser provisioning so a
+      # regression is reported in seconds, not after minutes of setup.
+      - name: Dependency audit
+        run: npm run audit
 
       # Playwright and its Chromium revision are pinned by package-lock.json, so
       # the browser is reproducible; --with-deps installs the system libraries.
@@ -45,11 +54,11 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       # The UI is Bangla: without a Bengali font Chromium lays the text out with
-      # zero glyphs and Playwright reports visible elements as hidden.
+      # zero glyphs and Playwright reports visible text as hidden. Both packages
+      # are in Ubuntu main. No `apt-get update` here: the Playwright step above
+      # already refreshed the package lists in this job.
       - name: Install Bengali fonts
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fonts-noto-core fonts-lohit-bengali
+        run: sudo apt-get install -y --no-install-recommends fonts-noto-core fonts-lohit-beng-bengali
 
       # Fail with an actionable message before the suite if the browser cannot
       # load its libraries or no Bengali font is resolvable.

@@ -99,7 +99,7 @@ if (!bengaliFont) {
     "no Bengali-capable font found in " +
       (fontDirs.length ? fontDirs.join(", ") : "the standard font directories") +
       " — without it Bangla text lays out with zero glyphs and Playwright reports it as hidden.\n" +
-      "  install `fonts-noto-core` and `fonts-lohit-bengali` (apt), or point FONTCONFIG_FILE at a config listing them",
+      "  install `fonts-noto-core` and `fonts-lohit-beng-bengali` (apt), or point FONTCONFIG_FILE at a config listing them",
   );
 }
 

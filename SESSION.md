@@ -1,3 +1,31 @@
+# Dependency audit gate checkpoint - 20 November 2026
+
+Issue #20 continuation. Branch `fix/ci-gate`, on top of `7370ab7`.
+
+## What changed
+
+- `npm run audit` runs `npm audit --audit-level=low`, npm's strictest threshold: any advisory at any severity fails. The tree is at zero, so the gate is a ratchet, not a new baseline.
+- The workflow runs that script in a `Dependency audit` step immediately after `npm ci` and before the browser provisioning, so a regression is reported in seconds instead of after several minutes of Chromium and font setup. `npm ci` keeps `--no-audit` so the audit is paid for once, in a named step.
+
+## Fresh-eyes review of the #20 workflow
+
+The review found one defect that would have failed every run, and one redundant step:
+
+- **Wrong apt package name.** Ubuntu 24.04 does not publish `fonts-lohit-bengali`; the package is `fonts-lohit-beng-bengali` (2.91.5-3, section main, verified on packages.ubuntu.com for noble). `apt-get install` would have exited 100 with "Unable to locate package" before any test ran. `fonts-noto-core` (20201225-2, main, provides Noto Sans Bengali) was already correct. The remediation text in `scripts/verify-browser-env.mjs` named the same non-existent package; it now names the real one.
+- **Redundant `apt-get update`.** The `npx playwright install --with-deps chromium` step immediately above installs apt packages and therefore refreshes the package lists in the same job, so the second update only re-downloaded the same indexes. The font step is now a single `apt-get install` with a comment explaining why it is safe.
+- Otherwise the step order was kept: install, audit, browser, fonts, environment check, typecheck, lint, tests, build. Each is a named step so a red run points at one thing.
+
+## Verification
+
+- Clean tree: `npm run audit` exit **0**, `found 0 vulnerabilities`.
+- Deliberate break, in a scratch directory outside the repo: a lockfile pinning `lodash@4.17.20` makes the same command exit **1** with `Severity: high`, so the step is a real gate and not a log line.
+- `.github/workflows/ci.yml` parsed with `js-yaml`: runner `ubuntu-24.04`, 11 steps in the intended order, the audit step's command is exactly `npm run audit`, and the font step installs the two confirmed packages.
+- Exact local CI order after a fresh `npm ci` (exit 0): `verify-browser-env` 0 - `audit` 0 - `typecheck` 0 - `lint` 0 (the same 3 pre-existing `react-refresh` warnings) - `test:ci` 0 (**122/122 tests in 15 files, 0 skipped, 3 browser specs**, gate line `test gate: ok ... (floor 110)`) - `build` 0 (`db:migrate` skipped, `DATABASE_URL` unset).
+
+## Not verifiable from this runner
+
+`sudo` is disabled here, so the two apt steps cannot run locally; both package names were confirmed against the Ubuntu package index instead. `gh` is unauthenticated, so no Actions run was observed and no PR was opened.
+
 # CI gate checkpoint - 20 November 2026
 
 Issue #20. Base commit `6c60ba2` (the pushed `fix/dependency-audit` branch), branch `fix/ci-gate`, deliberately stacked: CI must enforce the guarantee #15 was verified against, on the audited lockfile and the 110-test baseline.
