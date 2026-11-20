@@ -1,5 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { useHishab } from "./store.ts";
+import { parseBackup } from "./backup.ts";
+import { apply, buildReversal } from "./engine.ts";
 import { makeSeed } from "./seed.ts";
 import type { Books } from "./types.ts";
 
@@ -24,6 +26,11 @@ const corruptions: [string, (books: Books) => void][] = [
   ["offsetting errors in different entries", b => {
     b.entries[0].lines[0].debit += 1;
     b.entries[1].lines[0].credit += 1;
+  }],
+  ["stock sale missing its journal", b => { b.entries[1].lines = []; }],
+  ["consignment incorrectly posting money", b => {
+    const consign = b.entries.find(row => row.kind === "consign")!;
+    consign.lines = b.entries[1].lines;
   }],
   ["fractional paisa", b => { b.products[0].pricePaisa = 0.5; }],
   ["duplicate entry ID", b => { b.entries[1].id = b.entries[0].id; }],
@@ -59,4 +66,14 @@ it("rejects a stale restore when another tab has changed the device books", asyn
   await expect(async () => useHishab.getState().importBooks(backup)).rejects.toThrow();
   expect(put).not.toHaveBeenCalled();
   expect(disk.businessName).toBe("অন্য ট্যাব");
+});
+
+it("accepts v1 exports with archived parties, stock-only reversals and optional fields absent", () => {
+  const books = makeSeed();
+  books.parties[0].archived = true;
+  const original = books.entries.find(row => row.kind === "consign")!;
+  const reversal = buildReversal({ id: "undo-consign", at: Date.now(), original, reason: "ভুল পণ্য" });
+  const expected = apply(books, reversal);
+  expect(parseBackup(JSON.stringify(expected))).toEqual(JSON.parse(JSON.stringify(expected)));
+  expect(parseBackup(JSON.stringify({ ...books, mode: "khata", products: [], entries: [] })).mode).toBe("khata");
 });

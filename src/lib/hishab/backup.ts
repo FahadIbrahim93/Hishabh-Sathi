@@ -45,7 +45,7 @@ function checkReferences(books: Books) {
   const parties = uniqueIds(books.parties);
   const products = uniqueIds(books.products);
   const locations = new Set([WAREHOUSE, ...Array.from(parties, partyLoc)]);
-  const seen = new Set<string>();
+  const seen = new Map<string, Books["entries"][number]>();
 
   for (const row of books.entries) {
     if (seen.has(row.id)) throw new BooksError("ব্যাকআপে একই হিসাব একাধিকবার আছে।");
@@ -60,10 +60,13 @@ function checkReferences(books: Books) {
     if (missingParty || missingProduct || badLine || badMove || badReversal) {
       throw new BooksError("ব্যাকআপের হিসাবের সঙ্গে দোকান, পণ্য বা আগের হিসাবের মিল নেই।");
     }
-    if (row.lines.length === 0 && row.stock.length === 0) {
-      throw new BooksError("ব্যাকআপে খালি হিসাব আছে।");
+    const stockOnly = row.kind === "consign" ||
+      (row.kind === "return" && row.meta.returnMode === "consign") ||
+      (row.kind === "reversal" && seen.get(row.reversesEntryId!)?.lines.length === 0);
+    if (stockOnly ? row.lines.length !== 0 || row.stock.length === 0 : row.lines.length === 0) {
+      throw new BooksError("ব্যাকআপে টাকার হিসাব বা মালের লেনদেন অসম্পূর্ণ।");
     }
-    seen.add(row.id);
+    seen.set(row.id, row);
   }
 }
 
