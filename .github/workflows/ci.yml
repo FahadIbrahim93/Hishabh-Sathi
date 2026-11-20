@@ -6,9 +6,25 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege: this job only needs to read the repository.
+permissions:
+  contents: read
+
+# Superseded pushes do not need to finish; keep the queue short.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    # Pinned image: the browser specs need a known Ubuntu baseline, because the
+    # Chromium shared libraries and the Bengali fonts are installed per OS release.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CI: "true"
+      # A missing browser must fail the job instead of skipping the specs.
+      REQUIRE_BROWSER: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -16,10 +32,29 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "npm"
+          cache: npm
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      # Strict install: the committed lockfile is the source of truth, so a
+      # registry drift or a stale lockfile fails here instead of shipping.
+      - name: Install dependencies (from the committed lockfile)
+        run: npm ci --no-audit --no-fund
+
+      # Playwright and its Chromium revision are pinned by package-lock.json, so
+      # the browser is reproducible; --with-deps installs the system libraries.
+      - name: Install Chromium and its shared libraries
+        run: npx playwright install --with-deps chromium
+
+      # The UI is Bangla: without a Bengali font Chromium lays the text out with
+      # zero glyphs and Playwright reports visible elements as hidden.
+      - name: Install Bengali fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-core fonts-lohit-bengali
+
+      # Fail with an actionable message before the suite if the browser cannot
+      # load its libraries or no Bengali font is resolvable.
+      - name: Verify browser environment
+        run: node scripts/verify-browser-env.mjs
 
       - name: Typecheck
         run: npm run typecheck
@@ -27,8 +62,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Tests
-        run: npm test
+      # Runs the suite and then the gate: zero skipped tests, the browser spec
+      # present and passing, and at least 110 tests passed. A skip fails the job.
+      - name: "Tests (strict: a skipped test fails the job)"
+        run: npm run test:ci
 
       - name: Build
         run: npm run build

@@ -1,3 +1,34 @@
+# CI gate checkpoint - 20 November 2026
+
+Issue #20. Base commit `6c60ba2` (the pushed `fix/dependency-audit` branch), branch `fix/ci-gate`, deliberately stacked: CI must enforce the guarantee #15 was verified against, on the audited lockfile and the 110-test baseline.
+
+## What was wrong
+
+`.github/workflows/ci.yml` ran `npm install --no-audit --no-fund`, so the listen job did not prove the committed lockfile installs. It never installed a browser or fonts, relying on the runner image; the browser specs call `it.skipIf(!chrome && !process.env.CI)`, so any environment change could turn the durable-write evidence into a silent skip with a green job. `vercel.json` also pinned `npm install --omit=dev`, which omits `vite` and cannot build.
+
+## What changed
+
+- `npm ci --no-audit --no-fund` in CI and in `vercel.json` (strict, lockfile is the source of truth).
+- `runs-on: ubuntu-24.04` (pinned), `permissions: contents: read`, `concurrency`, `timeout-minutes: 25`, `CI=true` and `REQUIRE_BROWSER=1`.
+- `npx playwright install --with-deps chromium`: the Chromium revision is pinned by `package-lock.json`; `--with-deps` installs the shared libraries.
+- `sudo apt-get install fonts-noto-core fonts-lohit-bengali`: without a Bengali font Chromium lays Bangla out with zero glyphs and Playwright reports visible text as hidden.
+- New `scripts/verify-browser-env.mjs` runs before the suite: it checks the pinned binary exists, that `ldd` reports no unresolved library, and that a Bengali-capable font is resolvable, failing with an actionable message instead of a mystery timeout.
+- New `scripts/check-test-gate.mjs` plus `npm run test:ci`: reads the vitest JSON report and fails on any skipped/pending/todo test, any failure, a browser spec that did not run (or ran fewer than 3 cases), or fewer than 110 passing tests (`MIN_TESTS`).
+- `receipt.browser.test.ts` now uses `chrome || requireBrowser ? it : it.skip`, and throws a clear error if it is asked to run without a browser, so CI cannot skip it.
+- `src/lib/ci/test-gate.test.ts` covers the gate: skip detected, missing browser spec, shrunken suite, failures, empty report, custom floor.
+
+## Enforcement demonstrated
+
+With the browser spec excluded through a deliberately broken `vitest.config.ts`, `npm run test:ci` exited **1** with `test gate: FAILED - the browser spec receipt.browser.test.ts did not run at all`. The config was restored byte-for-byte and the same command exited **0**.
+
+## Verification (fresh dependency state, exact CI command order)
+
+`npm ci` **0** - `npx playwright install chromium` **0** - `node scripts/verify-browser-env.mjs` **0** - `npm run typecheck` **0** - `npm run lint` **0** (3 pre-existing `react-refresh` warnings) - `npm run test:ci` **0**, **117/117 tests in 14 files, 0 skipped, 3 browser specs executing (10.9s)**, gate line `test gate: ok - 117 passed, 0 failed, 0 skipped, 3 browser specs across 14 files (floor 110)` - `npm run build` **0** - `npm audit` **0**. The workflow YAML was parsed programmatically to confirm the step list, runner, permissions and that `npm ci` replaced `npm install`.
+
+## Not verifiable from this runner
+
+`gh` is unauthenticated, so no GitHub Actions run was observed and no PR could be opened; issue #20 cannot be closed here. `sudo` is disabled on this VM, so `npx playwright install --with-deps` and the `apt-get` font step cannot run locally: the local run used libraries and fonts provisioned beforehand (`/tmp/chromelibs` plus `LD_LIBRARY_PATH` and `FONTCONFIG_FILE`), while the workflow provisions them on the pinned Ubuntu image. The `vercel.json` change is unverified without a deploy.
+
 # Dependency audit checkpoint - 20 November 2026
 
 Issue #15. `npm audit` on the lockfile before this branch: **15 advisories - 3 critical, 1 high, 9 moderate, 2 low**. After: **0 - `found 0 vulnerabilities`, exit 0**. Base commit `5445b6a` (stacked on the catalog durability draft), branch `fix/dependency-audit`.

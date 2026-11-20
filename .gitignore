@@ -16,3 +16,6 @@ dist-ssr
 npm-debug.log*
 coverage/
 .pnpm-debug.log*
+
+# Vitest JSON report consumed by scripts/check-test-gate.mjs
+.vitest-report.json
