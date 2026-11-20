@@ -16,6 +16,7 @@ export function FlowScreen() {
   const draft = useHishab((s) => s.draft);
   const patchDraft = useHishab((s) => s.patchDraft);
   const flowBack = useHishab((s) => s.flowBack);
+  const saving = useHishab((s) => s.pendingReceipt !== null);
   if (!draft) return null;
 
   const steps = stepsFor(draft, books.mode);
@@ -27,7 +28,7 @@ export function FlowScreen() {
   const jump = (step: FlowStep) => patchDraft({ step });
 
   return (
-    <div data-flow={draft.kind}>
+    <fieldset data-flow={draft.kind} disabled={saving} aria-busy={saving} className="min-w-0">
       <ScreenHeader title={titleOf(draft)} onBack={back} />
       <p className="px-4 pb-2 text-sm text-ink-soft">
         ধাপ {toBn(Math.min(index + 1, steps.length))} / {toBn(steps.length)}
@@ -36,8 +37,8 @@ export function FlowScreen() {
       {draft.step === "product" ? <ProductStep onNext={jump} /> : null}
       {draft.step === "money" ? <MoneyStep onNext={jump} /> : null}
       {draft.step === "reason" ? <ReasonStep onNext={jump} /> : null}
-      {draft.step === "confirm" ? <ConfirmStep onEdit={jump} /> : null}
-    </div>
+      {draft.step === "confirm" ? <ConfirmStep onEdit={jump} saving={saving} /> : null}
+    </fieldset>
   );
 }
 
@@ -455,12 +456,11 @@ function ReasonStep({ onNext }: { onNext: (step: FlowStep) => void }) {
   );
 }
 
-function ConfirmStep({ onEdit }: { onEdit: (step: FlowStep) => void }) {
+function ConfirmStep({ onEdit, saving }: { onEdit: (step: FlowStep) => void; saving: boolean }) {
   const books = useHishab((s) => s.books);
   const draft = useHishab((s) => s.draft)!;
   const commitEntry = useHishab((s) => s.commitEntry);
   const idRef = useRef(crypto.randomUUID());
-  const [saving, setSaving] = useState(false);
   const [spoken, setSpoken] = useState(false);
   const [error, setError] = useState("");
   const view = previewDraft(books, draft);
@@ -523,20 +523,19 @@ function ConfirmStep({ onEdit }: { onEdit: (step: FlowStep) => void }) {
         <button
           type="button"
           disabled={!view.ok || saving}
-          onClick={() => {
+          onClick={async () => {
             if (!view.ok || saving) return;
-            setSaving(true);
+            setError("");
             try {
-              commitEntry(entryFromDraft(books, draft, idRef.current));
+              await commitEntry(entryFromDraft(books, draft, idRef.current));
             } catch (err) {
-              setSaving(false);
               setError(err instanceof Error ? err.message : "সেভ হয়নি");
             }
           }}
           className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-palm px-3 font-display text-base font-semibold text-paper disabled:opacity-40"
         >
           <Check className="size-5" aria-hidden="true" />
-          সেভ করুন
+          {saving ? "সেভ হচ্ছে…" : "সেভ করুন"}
         </button>
       </div>
       <p className="text-center text-sm text-ink-soft">কথা নিজে থেকে টাকা বদলায় না। সেভ আপনি চাপলেই।</p>

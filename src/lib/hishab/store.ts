@@ -1,8 +1,8 @@
 import { create } from "zustand";
-import { apply, buildOpening, buildReversal, buildStockAdd } from "./engine.ts";
+import { BooksError, apply, buildOpening, buildReversal, buildStockAdd } from "./engine.ts";
 import { makeSeed } from "./seed.ts";
 import { takaToPaisa } from "./money.ts";
-import { openDB, DBSchema, type IDBPDatabase } from "idb";
+import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { Books, Draft, Entry, Mode, Party, Product } from "./types.ts";
 
 /* ------------------------------------------------------------------ */
@@ -40,6 +40,9 @@ async function openDb(): Promise<IDBPDatabase<HishabDB>> {
         // oldVersion < 2: future migrations go here, e.g.
         // if (oldVersion < 2) { ... }
       },
+    }).catch((error) => {
+      dbReady = null;
+      throw error;
     });
   }
   dbInstance = await dbReady;
@@ -62,11 +65,32 @@ async function persistDbBooks(books: Books): Promise<boolean> {
   try {
     const db = await openDb();
     const tx = db.transaction(STORE_NAME, "readwrite");
-    tx.objectStore(STORE_NAME).put(books, DB_KEY);
-    await tx.done;
+    await Promise.all([tx.objectStore(STORE_NAME).put(books, DB_KEY), tx.done]);
     return true;
   } catch {
     return false;
+  }
+}
+
+// Compare and write inside one transaction so a stale confirmation cannot
+// replace books that another tab has already updated.
+async function writeConfirmedBooks(previous: Books, next: Books): Promise<void> {
+  try {
+    const db = await openDb();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    try {
+      const store = tx.objectStore(STORE_NAME);
+      const current = await store.get(DB_KEY);
+      if (JSON.stringify(current) !== JSON.stringify(previous)) {
+        throw new BooksError("হিসাব বদলেছে। আবার খুলে পাওনা মিলিয়ে নিন।");
+      }
+      await store.put(next, DB_KEY);
+    } finally {
+      await tx.done;
+    }
+  } catch (error) {
+    if (error instanceof BooksError) throw error;
+    throw new Error("এই ফোনে সেভ হয়নি। আবার চেষ্টা করুন।", { cause: error });
   }
 }
 
@@ -133,7 +157,8 @@ interface HishabState {
   openDraft: (draft: Draft) => void;
   patchDraft: (patch: Partial<Draft>) => void;
   flowBack: (step: Draft["step"] | "exit") => void;
-  commitEntry: (entry: Entry) => void;
+  pendingReceipt: { entryId: string; done: Promise<void> } | null;
+  commitEntry: (entry: Entry) => Promise<void>;
   addParty: (name: string, role: Party["role"], phone?: string) => string;
   addProduct: (input: NewProduct) => string;
   editParty: (id: string, patch: { name?: string; phone?: string; role?: Party["role"] }) => void;
@@ -221,12 +246,25 @@ export const useHishab = create<HishabState>((set, get) => ({
     }
     get().patchDraft({ step });
   },
-  commitEntry: (entry) => {
-    const books = apply(get().books, entry);
-    const nav = get().nav.filter((screen) => screen.id !== "flow");
-    nav.push({ id: "receipt", entryId: entry.id });
-    set({ books, saved: true, nav, draft: null, toast: "হিসাব সেভ হয়েছে" });
-    persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
+  pendingReceipt: null,
+  commitEntry: async (entry) => {
+    const { pendingReceipt, books: previous } = get();
+    if (pendingReceipt) {
+      if (pendingReceipt.entryId === entry.id) return pendingReceipt.done;
+      throw new BooksError("আগের হিসাব সেভ হচ্ছে। একটু অপেক্ষা করুন।");
+    }
+    const books = apply(previous, entry);
+    const done = persistChain.then(async () => {
+      await writeConfirmedBooks(previous, books);
+      const nav = get().nav.filter((screen) => screen.id !== "flow" &&
+        !(screen.id === "receipt" && screen.entryId === entry.id));
+      nav.push({ id: "receipt", entryId: entry.id });
+      set({ books, saved: true, nav, draft: null, toast: "হিসাব সেভ হয়েছে" });
+    }).finally(() => set({ pendingReceipt: null }));
+    // A failed confirmation must not block the next attempt.
+    persistChain = done.catch(() => undefined);
+    set({ pendingReceipt: { entryId: entry.id, done }, toast: null });
+    return done;
   },
   addParty: (name, role, phone?) => {
     const trimmed = name.trim();
