@@ -1,13 +1,7 @@
 import { useState } from "react";
 import { takaToPaisa, toBnGrouped } from "@/lib/hishab/money";
 import { useHishab } from "@/lib/hishab/store";
-import {
-  Primary,
-  Secondary,
-  ScreenHeader,
-  Page,
-  TextField,
-} from "@/components/hishab/bits";
+import { Primary, Secondary, ScreenHeader, Page, TextField } from "@/components/hishab/bits";
 
 export function OnboardingScreen() {
   const createBusiness = useHishab((s) => s.createBusiness);
@@ -16,12 +10,16 @@ export function OnboardingScreen() {
   const [name, setName] = useState("");
   const [cashTaka, setCashTaka] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const create = async () => {
     if (!name.trim()) return;
     setSaving(true);
+    setError("");
     try {
       await createBusiness(name.trim(), takaToPaisa(cashTaka));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "সেভ হয়নি। আবার চেষ্টা করুন।");
     } finally {
       setSaving(false);
     }
@@ -54,11 +52,7 @@ export function OnboardingScreen() {
               <button
                 key={d}
                 type="button"
-                onClick={() =>
-                  setCashTaka((c) =>
-                    c < 1_00_00_000 ? c * 10 + d : c
-                  )
-                }
+                onClick={() => setCashTaka((c) => (c < 1_00_00_000 ? c * 10 + d : c))}
                 className="min-h-14 rounded-xl border border-line bg-card text-ink font-semibold"
               >
                 {d}
@@ -69,31 +63,32 @@ export function OnboardingScreen() {
               onClick={() => setCashTaka(0)}
               className="min-h-14 rounded-xl border border-line bg-card text-ink font-semibold"
             >
-                ০
+              ০
             </button>
             <button
               type="button"
               onClick={() => setCashTaka((c) => Math.floor(c / 10))}
               className="min-h-14 rounded-xl border border-line bg-card text-ink font-semibold"
             >
-                ⌫
+              ⌫
             </button>
           </div>
-          <p className="text-sm text-ink-soft">
-            ৳ {toBnGrouped(cashTaka)}
-          </p>
+          <p className="text-sm text-ink-soft">৳ {toBnGrouped(cashTaka)}</p>
         </div>
+        {error ? (
+          <p role="alert" className="text-sm text-clay">
+            {error}
+          </p>
+        ) : null}
         <div className="grid grid-cols-2 gap-3">
-          <Secondary onClick={useDemo}>
-            ডেমো দোকান দিয়ে শুরু করুন
-          </Secondary>
+          <Secondary onClick={useDemo}>ডেমো দোকান দিয়ে শুরু করুন</Secondary>
           <Primary onClick={create} disabled={saving || !name.trim()}>
             শুরু করুন
           </Primary>
         </div>
         <p className="text-sm text-ink-soft leading-relaxed">
-          সব হিসাব এই ফোনে ঠিকমত সংরক্ষিত থাকবে। মাল রাখা মাল বিক্রি নয়
-          — ওটা এখনও আপনার। যেখানে খুব প্রয়োজন, সেখানে শুধু নগদ দিন।
+          সব হিসাব এই ফোনে ঠিকমত সংরক্ষিত থাকবে। মাল রাখা মাল বিক্রি নয় — ওটা এখনও আপনার। যেখানে খুব
+          প্রয়োজন, সেখানে শুধু নগদ দিন।
         </p>
       </div>
     </Page>

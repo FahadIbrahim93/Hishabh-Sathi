@@ -1,20 +1,35 @@
-# Integration checkpoint — 20 November 2026
+# Integration checkpoint - 20 November 2026
 
-**Completed:** Reviewed and merged PR #29 (manual backup validation) and PR #31 (single reversal per original entry), in that order. Both were originally draft PRs. PR #31 was stacked on #29; GitHub recalculated mergeability after the first merge. Both merges used exact expected head SHAs.
+**Post-merge verification of `main` after PR #29 and PR #31: COMPLETED.**
 
-- PR #29: https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/29 — merge commit `32902a00e96f8159029a70bb9e30e8ac35e8b6f2`.
-- PR #31: https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/31 — merge commit `c9c940de5e0dbab0dbd9411609aac6716cd366ed`.
-- Review submissions and inline review threads: none on either PR.
-- Pre-merge GitHub Actions evidence: PR #29 implementation run 44742487364 passed install, typecheck, lint, tests (reported 102), build. PR #31 implementation run 44745505865 passed the same steps (reported 106 tests). Both PR descriptions document browser failure/retry regression scenarios.
-- **Fresh post-merge verification: NOT COMPLETED.** GitHub combined statuses and the available pull-request-filtered workflow-run query returned no checks for final main merge commit at inspection time. The current execution environment cannot clone GitHub (network DNS unavailable), so no independent `npm ci`, `npm run typecheck`, `npm run lint`, `npm test`, or `npm run build` was run against merged main. Do not represent pre-merge results as a final main CI pass.
+- Verified commit `77c12186e0fe4a9ab5bd637929871dc2e970231b` (the recorded `77c12186`), checked out in the worktree. Merge commits confirmed locally: PR #29 `32902a00e96f8159029a70bb9e30e8ac35e8b6f2`, PR #31 `c9c940de5e0dbab0dbd9411609aac6716cd366ed`.
+- Commands taken from `package.json`, Node 26.13.0 / npm 11.20.0, fresh `npm ci` from the committed lockfile (exit 0):
+  - `npm run typecheck` - exit 0.
+  - `npm run lint` - exit 0, 3 pre-existing `react-refresh` warnings, 0 errors.
+  - `npm test` - exit 0, 12 files, 106 tests, 0 skipped.
+  - `npm run build` - exit 0; `db:migrate` skipped because `DATABASE_URL` is unset, so no database was touched.
+- The three IndexedDB browser specs in `receipt.browser.test.ts` really ran against a real Chromium, not skipped. Bringing Chromium up on this runner needed two environment fixes that are runner gaps, not product defects: 117 Ubuntu library packages extracted privately under `/tmp` (no root, `sudo` blocked) and Bengali fonts (Lohit Bengali, Noto) with `FONTCONFIG_FILE`. Without fonts the Bangla text boxes had zero height and Playwright reported the failure message as hidden; the assertions were sound.
+- Both PR claims hold on merged `main`: invalid backups never write, valid backups restore, one reversal per original, failed money writes never show a receipt, stale tabs are rejected for money, restore and reversal flows, books stay balanced and stock consistent.
+- Two gaps found and fixed on the branch below: catalog/settings writes still claimed success on a failed write and bypassed the compare-and-swap.
 
-**Next task:** Trigger or inspect a new GitHub Actions CI run for `c9c940d`, confirm install/typecheck/lint/all tests/build and browser IndexedDB backup/reversal regression coverage. If CI cannot run on merges, repair workflow trigger in a separate reviewed PR. Then perform manual device backup/restore QA and audit remaining storage writes and security vulnerabilities. No production-readiness sign-off yet.
+**Next task:** manual device QA of backup/restore and reversal on a real phone browser, then `npm audit` triage (#15) and the ledger property tests required by CONTRIBUTING (#18). No production-readiness sign-off yet.
 
 ---
 
 # Hishab Sathi engineering session
 
 **20 November 2026 · Dhaka**
+
+## Catalog write durability · 20 November 2026
+
+**Finding.** Confirmation, reversal and restore waited for an IndexedDB commit, but catalog and settings writes did not. `persistDbBooks` returned `false` instead of rejecting and `persistSafe` swallowed it, so adding or editing a shop, a product, or switching the book mode showed the "saved on this phone" state before anything reached the device. Those same writes skipped the compare-and-swap, so a stale tab could replace newer books. `createBusiness` also finished onboarding before the first shop record was durable.
+
+**Change.** Catalog and settings writes now use the same single-transaction compare-and-swap as money entries, compared against the last snapshot this tab knows is committed. A failed write reaches the caller, which shows the "not saved on this phone" state and a Bangla message. An absent device record matches an expected empty shop, so first-run onboarding still works. Onboarding now stays on the setup screen with the error when the first write fails.
+
+**Verification.** Four new regressions in `catalog-durability.test.ts` (failed catalog write, working catalog write, stale-tab refusal, failed first shop write) failed on the pre-fix code and pass now. On the branch: `typecheck` exit 0, `lint` exit 0 with the same 3 warnings, `npm test` 110 tests in 13 files with the browser specs executing, `npm run build` exit 0. Browser-level coverage of these four paths was not added; the store contract is covered with a faked IndexedDB. No real-device pass yet.
+
+**Next task awaiting confirmation.** Review this draft PR before merging, then the manual device QA above.
+
 
 ## Duplicate reversal fix · 20 November 2026
 

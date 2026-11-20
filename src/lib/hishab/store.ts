@@ -54,15 +54,13 @@ async function openDb(): Promise<IDBPDatabase<HishabDB>> {
   return dbInstance;
 }
 
-async function persistDbBooks(books: Books): Promise<boolean> {
-  try {
-    const db = await openDb();
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    await Promise.all([tx.objectStore(STORE_NAME).put(books, DB_KEY), tx.done]);
-    return true;
-  } catch {
-    return false;
-  }
+function isEmptyBooks(books: Books): boolean {
+  return (
+    books.businessName === "" &&
+    books.parties.length === 0 &&
+    books.products.length === 0 &&
+    books.entries.length === 0
+  );
 }
 
 // Compare and write inside one transaction so a stale confirmation cannot
@@ -74,7 +72,9 @@ async function writeConfirmedBooks(previous: Books, next: Books): Promise<void> 
     try {
       const store = tx.objectStore(STORE_NAME);
       const current = await store.get(DB_KEY);
-      if (JSON.stringify(current) !== JSON.stringify(previous)) {
+      // A brand-new device has no record yet, which matches an expected empty shop.
+      const untouched = current === undefined && isEmptyBooks(previous);
+      if (!untouched && JSON.stringify(current) !== JSON.stringify(previous)) {
         throw new BooksError("হিসাব বদলেছে। আবার খুলে পাওনা মিলিয়ে নিন।");
       }
       await store.put(next, DB_KEY);
@@ -99,8 +99,14 @@ const LEGACY_KEY = "hishab-sathi-v1";
 
 function checkBooks(value: unknown): Books {
   const books = value as Partial<Books> | null;
-  if (!books || books.version !== 1 || typeof books.businessName !== "string" ||
-      !Array.isArray(books.entries) || !Array.isArray(books.parties) || !Array.isArray(books.products)) {
+  if (
+    !books ||
+    books.version !== 1 ||
+    typeof books.businessName !== "string" ||
+    !Array.isArray(books.entries) ||
+    !Array.isArray(books.parties) ||
+    !Array.isArray(books.products)
+  ) {
     throw new Error("Invalid stored books");
   }
   return books as Books;
@@ -180,7 +186,16 @@ interface HishabState {
   addProduct: (input: NewProduct) => string;
   editParty: (id: string, patch: { name?: string; phone?: string; role?: Party["role"] }) => void;
   archiveParty: (id: string) => void;
-  editProduct: (id: string, patch: { name?: string; packName?: string; packSize?: number; priceTaka?: number; costTaka?: number }) => void;
+  editProduct: (
+    id: string,
+    patch: {
+      name?: string;
+      packName?: string;
+      packSize?: number;
+      priceTaka?: number;
+      costTaka?: number;
+    },
+  ) => void;
   archiveProduct: (id: string) => void;
   setMode: (mode: Mode) => void;
   setOnboarded: (value: boolean) => void;
@@ -204,9 +219,20 @@ function emptyBooks(): Books {
  */
 let startup: Promise<void> | undefined;
 let persistChain: Promise<unknown> = Promise.resolve();
-function persistSafe(books: Books): Promise<void> {
-  persistChain = persistChain.then(() => persistDbBooks(books).catch(() => undefined));
-  return persistChain as Promise<void>;
+// Last snapshot this tab knows is committed on the device. Catalog and settings
+// writes compare against it, so a stale tab cannot replace newer books and a
+// failed write reaches the caller instead of being shown as saved.
+let persistedBooks: Books | undefined;
+
+function persistSafe(next: Books): Promise<void> {
+  const previous = persistedBooks;
+  const done = persistChain.then(async () => {
+    await writeConfirmedBooks(previous ?? next, next);
+    persistedBooks = next;
+  });
+  // A rejected write must not block the next attempt.
+  persistChain = done.catch(() => undefined);
+  return done;
 }
 
 export const useHishab = create<HishabState>((set, get) => ({
@@ -222,9 +248,14 @@ export const useHishab = create<HishabState>((set, get) => ({
     if (get().ready) return Promise.resolve();
     if (startup) return startup;
     startup = loadDeviceBooks()
-      .then((books) => set({ books, ready: true, saved: true, onboarded: Boolean(books.businessName) }))
+      .then((books) => {
+        persistedBooks = books;
+        set({ books, ready: true, saved: true, onboarded: Boolean(books.businessName) });
+      })
       .catch(() => set({ startupFailed: true }))
-      .finally(() => { startup = undefined; });
+      .finally(() => {
+        startup = undefined;
+      });
     set({ startupFailed: false });
     return startup;
   },
@@ -256,19 +287,25 @@ export const useHishab = create<HishabState>((set, get) => ({
   pendingReceipt: null,
   commitEntry: async (entry) => {
     const { pendingReceipt, pendingReversal, restoring, books: previous } = get();
-    if (pendingReversal || restoring) throw new BooksError("হিসাব সেভ হচ্ছে। একটু পরে চেষ্টা করুন।");
+    if (pendingReversal || restoring)
+      throw new BooksError("হিসাব সেভ হচ্ছে। একটু পরে চেষ্টা করুন।");
     if (pendingReceipt) {
       if (pendingReceipt.entryId === entry.id) return pendingReceipt.done;
       throw new BooksError("আগের হিসাব সেভ হচ্ছে। একটু অপেক্ষা করুন।");
     }
     const books = apply(previous, entry);
-    const done = persistChain.then(async () => {
-      await writeConfirmedBooks(previous, books);
-      const nav = get().nav.filter((screen) => screen.id !== "flow" &&
-        !(screen.id === "receipt" && screen.entryId === entry.id));
-      nav.push({ id: "receipt", entryId: entry.id });
-      set({ books, saved: true, nav, draft: null, toast: "হিসাব সেভ হয়েছে" });
-    }).finally(() => set({ pendingReceipt: null }));
+    const done = persistChain
+      .then(async () => {
+        await writeConfirmedBooks(previous, books);
+        persistedBooks = books;
+        const nav = get().nav.filter(
+          (screen) =>
+            screen.id !== "flow" && !(screen.id === "receipt" && screen.entryId === entry.id),
+        );
+        nav.push({ id: "receipt", entryId: entry.id });
+        set({ books, saved: true, nav, draft: null, toast: "হিসাব সেভ হয়েছে" });
+      })
+      .finally(() => set({ pendingReceipt: null }));
     // A failed confirmation must not block the next attempt.
     persistChain = done.catch(() => undefined);
     set({ pendingReceipt: { entryId: entry.id, done }, toast: null });
@@ -278,7 +315,13 @@ export const useHishab = create<HishabState>((set, get) => ({
     const trimmed = name.trim();
     if (!trimmed) throw new Error("দোকানের নাম লিখুন।");
     const id = `p-${crypto.randomUUID()}`;
-    const party: Party = { id, name: trimmed, aliases: [trimmed], role, phone: phone?.trim() || undefined };
+    const party: Party = {
+      id,
+      name: trimmed,
+      aliases: [trimmed],
+      role,
+      phone: phone?.trim() || undefined,
+    };
     const books = { ...get().books, parties: [...get().books.parties, party] };
     set({ books, saved: true });
     persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
@@ -287,7 +330,8 @@ export const useHishab = create<HishabState>((set, get) => ({
   addProduct: (input) => {
     const name = input.name.trim();
     if (!name) throw new Error("মালের নাম লিখুন।");
-    if (!Number.isInteger(input.packSize) || input.packSize < 1) throw new Error("কেসে কত পিস, সেটা বলুন।");
+    if (!Number.isInteger(input.packSize) || input.packSize < 1)
+      throw new Error("কেসে কত পিস, সেটা বলুন।");
     const id = `g-${crypto.randomUUID()}`;
     const product: Product = {
       id,
@@ -376,16 +420,25 @@ export const useHishab = create<HishabState>((set, get) => ({
     const books = { ...get().books, businessName: trimmed };
     let opened = books;
     if (cashPaisa > 0) {
-      opened = apply(books, buildOpening({
-        id: `open-${crypto.randomUUID()}`,
-        at: Date.now(),
-        cashPaisa,
-        stock: [],
-        products: [],
-      }));
+      opened = apply(
+        books,
+        buildOpening({
+          id: `open-${crypto.randomUUID()}`,
+          at: Date.now(),
+          cashPaisa,
+          stock: [],
+          products: [],
+        }),
+      );
+    }
+    try {
+      await persistSafe(opened);
+    } catch (error) {
+      // Onboarding must not continue on a shop that never reached the device.
+      set({ saved: false });
+      throw error;
     }
     set({ books: opened, onboarded: true, saved: true });
-    await persistSafe(opened);
   },
   pendingReversal: null,
   reverseEntry: async (entryId, reason) => {
@@ -405,10 +458,13 @@ export const useHishab = create<HishabState>((set, get) => ({
       reason: trimmed,
     });
     const next = apply(books, reversal);
-    const done = persistChain.then(async () => {
-      await writeConfirmedBooks(books, next);
-      set({ books: next, saved: true, toast: "হিসাব বিলোপ করা হয়েছে" });
-    }).finally(() => set({ pendingReversal: null }));
+    const done = persistChain
+      .then(async () => {
+        await writeConfirmedBooks(books, next);
+        persistedBooks = next;
+        set({ books: next, saved: true, toast: "হিসাব বিলোপ করা হয়েছে" });
+      })
+      .finally(() => set({ pendingReversal: null }));
     persistChain = done.catch(() => undefined);
     set({ pendingReversal: { originalId: entryId, done }, toast: null });
     return done;
@@ -419,16 +475,26 @@ export const useHishab = create<HishabState>((set, get) => ({
   restoring: false,
   importBooks: async (source) => {
     const { books: previous, restoring, pendingReceipt, pendingReversal } = get();
-    if (restoring || pendingReceipt || pendingReversal) throw new BooksError("হিসাব সেভ হচ্ছে। একটু পরে চেষ্টা করুন।");
+    if (restoring || pendingReceipt || pendingReversal)
+      throw new BooksError("হিসাব সেভ হচ্ছে। একটু পরে চেষ্টা করুন।");
     set({ restoring: true, toast: null });
     try {
-      const raw = typeof source === "string" ? source : await source.text().catch(() => {
-        throw new BooksError("ব্যাকআপ ফাইলটি পড়া যায়নি।");
-      });
+      const raw =
+        typeof source === "string"
+          ? source
+          : await source.text().catch(() => {
+              throw new BooksError("ব্যাকআপ ফাইলটি পড়া যায়নি।");
+            });
       const books = parseBackup(raw);
       const done = persistChain.then(async () => {
         await writeConfirmedBooks(previous, books);
-        set({ books, saved: true, onboarded: Boolean(books.businessName), toast: "ব্যাকআপ ফেরত আনা হয়েছে" });
+        persistedBooks = books;
+        set({
+          books,
+          saved: true,
+          onboarded: Boolean(books.businessName),
+          toast: "ব্যাকআপ ফেরত আনা হয়েছে",
+        });
       });
       persistChain = done.catch(() => undefined);
       await done;
