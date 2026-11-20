@@ -1,6 +1,19 @@
 # Hishab Sathi engineering session
 
 **20 November 2026 · Dhaka**
+
+## Duplicate reversal fix · 20 November 2026
+
+**Current task completed in draft.** [PR #31](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/31) addresses [issue #30](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/30). It builds on the backup restore changes in [PR #29](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/29). Both await review and merge.
+
+**Finding.** Collecting ৳600 reduced Rahim’s dues from ৳8,000 to ৳7,400. The old engine accepted two reversals with different IDs for that collection, raising dues first to ৳8,000 and then to ৳8,600.
+
+**Change.** The ledger now allows one linked correction per original. Repeated taps share the pending save. The form keeps the reason on failure and reports success after IndexedDB commits. Reopening a corrected entry displays its status. Manual restore detects duplicate reversals. Existing device history remains readable and any historical duplicate needs owner reconciliation.
+
+**Verification.** Both new ledger and backup regression tests failed on the baseline. The implementation passed typecheck, lint, all 106 tests and the production build. Lint reported three existing warnings. Chrome aborted a reversal write, retried with the original reason, and rejected a second tab holding older books. Both tabs reloaded one linked correction and ৳8,000 due. A separate engine check reversed two distinct ৳600 payments once each. [Failing regression tests](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44745181224) · [Passing implementation](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44745505865)
+
+**Next task awaiting confirmation.** Review the backup restore PR first, then the reversal PR against the updated base. Verify required checks and review findings before merging either financial change.
+
 ## Manual backup restore · 20 November 2026
 
 **Current task** — The backup restore fix and its tests are in [draft PR #29](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/29), addressing [issue #28](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/28). The PR awaits review and merge.
