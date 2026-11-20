@@ -28,8 +28,10 @@ export function OnboardingScreen() {
   const useDemo = async () => {
     setSaving(true);
     try {
-      resetDemo();
+      await resetDemo();
       setOnboarded(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "সেভ হয়নি। আবার চেষ্টা করুন।");
     } finally {
       setSaving(false);
     }

@@ -50,14 +50,17 @@ beforeEach(async () => {
 it("reports a failed catalog write instead of claiming the shop was saved", async () => {
   failWrites = true;
   const before = disk.parties.length;
-  useHishab.getState().addParty("নতুন দোকান", "customer");
+  const saving = useHishab.getState().addParty("নতুন দোকান", "customer");
+  expect(useHishab.getState().books.parties).toHaveLength(before);
+  await expect(saving).rejects.toThrow();
+  expect(useHishab.getState().books.parties).toHaveLength(before);
   await vi.waitFor(() => expect(useHishab.getState().saved).toBe(false));
   expect(norm(useHishab.getState().toast ?? "")).toContain(SAVE_FAILED);
   expect(disk.parties).toHaveLength(before);
 });
 
 it("persists a catalog write that the device accepted", async () => {
-  const id = useHishab.getState().addParty("ভালো দোকান", "customer");
+  const id = await useHishab.getState().addParty("ভালো দোকান", "customer");
   await vi.waitFor(() => expect(disk.parties.some((party) => party.id === id)).toBe(true));
   expect(useHishab.getState().saved).toBe(true);
 });
@@ -66,7 +69,8 @@ it("refuses a catalog write built on a stale tab and keeps the newer books", asy
   const party = disk.parties[0];
   const originalName = party.name;
   disk = { ...disk, businessName: "অন্য ট্যাবের নাম" };
-  useHishab.getState().editParty(party.id, { name: "পুরোনো ট্যাবের নাম" });
+  await expect(useHishab.getState().editParty(party.id, { name: "পুরোনো ট্যাবের নাম" })).rejects.toThrow();
+  expect(useHishab.getState().books.parties[0].name).toBe(originalName);
   await vi.waitFor(() => expect(useHishab.getState().saved).toBe(false));
   expect(norm(useHishab.getState().toast ?? "")).toMatch(/বদলেছে|সেভ হয়নি/);
   expect(disk.businessName).toBe("অন্য ট্যাবের নাম");

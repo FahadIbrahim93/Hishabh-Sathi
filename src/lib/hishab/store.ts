@@ -182,10 +182,10 @@ interface HishabState {
   flowBack: (step: Draft["step"] | "exit") => void;
   pendingReceipt: { entryId: string; done: Promise<void> } | null;
   commitEntry: (entry: Entry) => Promise<void>;
-  addParty: (name: string, role: Party["role"], phone?: string) => string;
-  addProduct: (input: NewProduct) => string;
-  editParty: (id: string, patch: { name?: string; phone?: string; role?: Party["role"] }) => void;
-  archiveParty: (id: string) => void;
+  addParty: (name: string, role: Party["role"], phone?: string) => Promise<string>;
+  addProduct: (input: NewProduct) => Promise<string>;
+  editParty: (id: string, patch: { name?: string; phone?: string; role?: Party["role"] }) => Promise<void>;
+  archiveParty: (id: string) => Promise<void>;
   editProduct: (
     id: string,
     patch: {
@@ -195,9 +195,9 @@ interface HishabState {
       priceTaka?: number;
       costTaka?: number;
     },
-  ) => void;
-  archiveProduct: (id: string) => void;
-  setMode: (mode: Mode) => void;
+  ) => Promise<void>;
+  archiveProduct: (id: string) => Promise<void>;
+  setMode: (mode: Mode) => Promise<void>;
   setOnboarded: (value: boolean) => void;
   createBusiness: (name: string, cashPaisa: number) => Promise<void>;
   pendingReversal: { originalId: string; done: Promise<void> } | null;
@@ -205,7 +205,7 @@ interface HishabState {
   exportBooks: () => string;
   restoring: boolean;
   importBooks: (source: string | Blob) => Promise<void>;
-  resetDemo: () => void;
+  resetDemo: () => Promise<void>;
   dismissToast: () => void;
 }
 
@@ -213,24 +213,24 @@ function emptyBooks(): Books {
   return { version: 1, businessName: "", mode: "stock", parties: [], products: [], entries: [] };
 }
 
-/*
- * Persist writes are sequenced so a slower earlier write can never
- * overwrite a newer one (fire-and-forget from sync actions).
- */
 let startup: Promise<void> | undefined;
 let persistChain: Promise<unknown> = Promise.resolve();
-// Last snapshot this tab knows is committed on the device. Catalog and settings
-// writes compare against it, so a stale tab cannot replace newer books and a
-// failed write reaches the caller instead of being shown as saved.
-let persistedBooks: Books | undefined;
 
-function persistSafe(next: Books): Promise<void> {
-  const previous = persistedBooks;
+function commitCatalog(
+  next: Books,
+  success: Partial<Pick<HishabState, "toast" | "onboarded" | "nav" | "draft">> = {},
+): Promise<void> {
+  const previous = useHishab.getState().books;
   const done = persistChain.then(async () => {
-    await writeConfirmedBooks(previous ?? next, next);
-    persistedBooks = next;
+    try {
+      await writeConfirmedBooks(previous, next);
+      useHishab.setState({ books: next, saved: true, ...success });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "সেভ হয়নি। আবার চেষ্টা করুন।";
+      useHishab.setState({ saved: false, toast: message });
+      throw error;
+    }
   });
-  // A rejected write must not block the next attempt.
   persistChain = done.catch(() => undefined);
   return done;
 }
@@ -249,7 +249,7 @@ export const useHishab = create<HishabState>((set, get) => ({
     if (startup) return startup;
     startup = loadDeviceBooks()
       .then((books) => {
-        persistedBooks = books;
+
         set({ books, ready: true, saved: true, onboarded: Boolean(books.businessName) });
       })
       .catch(() => set({ startupFailed: true }))
@@ -297,7 +297,7 @@ export const useHishab = create<HishabState>((set, get) => ({
     const done = persistChain
       .then(async () => {
         await writeConfirmedBooks(previous, books);
-        persistedBooks = books;
+
         const nav = get().nav.filter(
           (screen) =>
             screen.id !== "flow" && !(screen.id === "receipt" && screen.entryId === entry.id),
@@ -311,7 +311,7 @@ export const useHishab = create<HishabState>((set, get) => ({
     set({ pendingReceipt: { entryId: entry.id, done }, toast: null });
     return done;
   },
-  addParty: (name, role, phone?) => {
+  addParty: async (name, role, phone?) => {
     const trimmed = name.trim();
     if (!trimmed) throw new Error("দোকানের নাম লিখুন।");
     const id = `p-${crypto.randomUUID()}`;
@@ -323,11 +323,10 @@ export const useHishab = create<HishabState>((set, get) => ({
       phone: phone?.trim() || undefined,
     };
     const books = { ...get().books, parties: [...get().books.parties, party] };
-    set({ books, saved: true });
-    persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
+    await commitCatalog(books);
     return id;
   },
-  addProduct: (input) => {
+  addProduct: async (input) => {
     const name = input.name.trim();
     if (!name) throw new Error("মালের নাম লিখুন।");
     if (!Number.isInteger(input.packSize) || input.packSize < 1)
@@ -355,8 +354,7 @@ export const useHishab = create<HishabState>((set, get) => ({
         }),
       );
     }
-    set({ books, saved: true, toast: "মাল যোগ হয়েছে" });
-    persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
+    await commitCatalog(books, { toast: "মাল যোগ হয়েছে" });
     return id;
   },
   editParty: (id, patch) => {
@@ -364,20 +362,14 @@ export const useHishab = create<HishabState>((set, get) => ({
     const party = books.parties.find((p) => p.id === id);
     if (!party) throw new Error("দোকান পাওয়া যায়নি।");
     const next = books.parties.map((p) => (p.id === id ? { ...p, ...patch } : p));
-    set({ books: { ...books, parties: next }, saved: true });
-    persistSafe({ ...books, parties: next }).catch(() =>
-      set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }),
-    );
+    return commitCatalog({ ...books, parties: next });
   },
   archiveParty: (id) => {
     const books = get().books;
     const party = books.parties.find((p) => p.id === id);
     if (!party) throw new Error("দোকান পাওয়া যায়নি।");
     const next = books.parties.map((p) => (p.id === id ? { ...p, archived: true } : p));
-    set({ books: { ...books, parties: next }, saved: true });
-    persistSafe({ ...books, parties: next }).catch(() =>
-      set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }),
-    );
+    return commitCatalog({ ...books, parties: next });
   },
   editProduct: (id, patch) => {
     const books = get().books;
@@ -393,25 +385,18 @@ export const useHishab = create<HishabState>((set, get) => ({
       if (patch.costTaka != null) updated.costPaisa = takaToPaisa(patch.costTaka);
       return updated;
     });
-    set({ books: { ...books, products: next }, saved: true });
-    persistSafe({ ...books, products: next }).catch(() =>
-      set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }),
-    );
+    return commitCatalog({ ...books, products: next });
   },
   archiveProduct: (id) => {
     const books = get().books;
     const product = books.products.find((p) => p.id === id);
     if (!product) throw new Error("মাল পাওয়া যায়নি।");
     const next = books.products.map((p) => (p.id === id ? { ...p, archived: true } : p));
-    set({ books: { ...books, products: next }, saved: true });
-    persistSafe({ ...books, products: next }).catch(() =>
-      set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }),
-    );
+    return commitCatalog({ ...books, products: next });
   },
   setMode: (mode) => {
     const books = { ...get().books, mode };
-    set({ books, saved: true });
-    persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
+    return commitCatalog(books);
   },
   setOnboarded: (value) => set({ onboarded: value }),
   createBusiness: async (name, cashPaisa) => {
@@ -431,14 +416,7 @@ export const useHishab = create<HishabState>((set, get) => ({
         }),
       );
     }
-    try {
-      await persistSafe(opened);
-    } catch (error) {
-      // Onboarding must not continue on a shop that never reached the device.
-      set({ saved: false });
-      throw error;
-    }
-    set({ books: opened, onboarded: true, saved: true });
+    await commitCatalog(opened, { onboarded: true });
   },
   pendingReversal: null,
   reverseEntry: async (entryId, reason) => {
@@ -461,7 +439,7 @@ export const useHishab = create<HishabState>((set, get) => ({
     const done = persistChain
       .then(async () => {
         await writeConfirmedBooks(books, next);
-        persistedBooks = next;
+
         set({ books: next, saved: true, toast: "হিসাব বিলোপ করা হয়েছে" });
       })
       .finally(() => set({ pendingReversal: null }));
@@ -488,7 +466,7 @@ export const useHishab = create<HishabState>((set, get) => ({
       const books = parseBackup(raw);
       const done = persistChain.then(async () => {
         await writeConfirmedBooks(previous, books);
-        persistedBooks = books;
+
         set({
           books,
           saved: true,
@@ -504,14 +482,11 @@ export const useHishab = create<HishabState>((set, get) => ({
   },
   resetDemo: () => {
     const books = makeSeed();
-    set({
-      books,
-      saved: true,
+    return commitCatalog(books, {
       nav: [{ id: "home" }],
       draft: null,
       toast: "ডেমো হিসাব আবার বসানো হয়েছে",
     });
-    persistSafe(books).catch(() => set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }));
   },
   dismissToast: () => set({ toast: null }),
 }));

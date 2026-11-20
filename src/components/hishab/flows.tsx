@@ -87,9 +87,9 @@ function PartyStep({ onNext }: { onNext: (step: FlowStep) => void }) {
       </div>
       {query.trim() ? (
         <Secondary
-          onClick={() => {
+          onClick={async () => {
             try {
-              const id = addParty(query, role === "supplier" ? "supplier" : "customer");
+              const id = await addParty(query, role === "supplier" ? "supplier" : "customer");
               patchDraft({ partyId: id, partySkipped: false });
               onNext(nextAfter("party", draft, books.mode));
             } catch (err) {

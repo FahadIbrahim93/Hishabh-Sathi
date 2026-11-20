@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:ci": "vitest run --reporter=default --reporter=json --outputFile=.vitest-report.json && node scripts/check-test-gate.mjs .vitest-report.json",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "audit": "npm audit --audit-level=low"
   },
   "overrides": {
     "nf3": "0.3.17"
