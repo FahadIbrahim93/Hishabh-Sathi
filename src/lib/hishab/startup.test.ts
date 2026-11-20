@@ -61,3 +61,28 @@ it("keeps legacy books when migration fails and migrates on retry", async () => 
   expect(useHishab.getState().books).toEqual(existing);
   expect(legacy.removeItem).toHaveBeenCalledOnce();
 });
+
+it("shares one in-flight startup read across overlapping calls", async () => {
+  let finish!: (books: Books) => void;
+  read.mockImplementationOnce(() => new Promise<Books>((resolve) => { finish = resolve; }));
+  const a = useHishab.getState().hydrate();
+  const b = useHishab.getState().hydrate();
+  await vi.waitFor(() => expect(read).toHaveBeenCalledOnce());
+  finish(existing);
+  await Promise.all([a, b]);
+  expect(useHishab.getState().books).toEqual(existing);
+  expect(write).not.toHaveBeenCalled();
+});
+
+it("keeps legacy books when the write request succeeds but the transaction aborts", async () => {
+  read.mockResolvedValue(undefined);
+  legacy.getItem.mockReturnValue(JSON.stringify(existing));
+  db.transaction.mockImplementationOnce(() => ({
+    objectStore: () => ({ get: read, add: write, put: write }),
+    get done() { return Promise.reject(new Error("transaction aborted")); },
+  }));
+  await useHishab.getState().hydrate();
+  expect(write).toHaveBeenCalledOnce();
+  expect(legacy.removeItem).not.toHaveBeenCalled();
+  expect(useHishab.getState().ready).toBe(false);
+});
