@@ -1,3 +1,17 @@
+# Integration checkpoint — 20 November 2026
+
+**Completed:** Reviewed and merged PR #29 (manual backup validation) and PR #31 (single reversal per original entry), in that order. Both were originally draft PRs. PR #31 was stacked on #29; GitHub recalculated mergeability after the first merge. Both merges used exact expected head SHAs.
+
+- PR #29: https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/29 — merge commit `32902a00e96f8159029a70bb9e30e8ac35e8b6f2`.
+- PR #31: https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/31 — merge commit `c9c940de5e0dbab0dbd9411609aac6716cd366ed`.
+- Review submissions and inline review threads: none on either PR.
+- Pre-merge GitHub Actions evidence: PR #29 implementation run 44742487364 passed install, typecheck, lint, tests (reported 102), build. PR #31 implementation run 44745505865 passed the same steps (reported 106 tests). Both PR descriptions document browser failure/retry regression scenarios.
+- **Fresh post-merge verification: NOT COMPLETED.** GitHub combined statuses and the available pull-request-filtered workflow-run query returned no checks for final main merge commit at inspection time. The current execution environment cannot clone GitHub (network DNS unavailable), so no independent `npm ci`, `npm run typecheck`, `npm run lint`, `npm test`, or `npm run build` was run against merged main. Do not represent pre-merge results as a final main CI pass.
+
+**Next task:** Trigger or inspect a new GitHub Actions CI run for `c9c940d`, confirm install/typecheck/lint/all tests/build and browser IndexedDB backup/reversal regression coverage. If CI cannot run on merges, repair workflow trigger in a separate reviewed PR. Then perform manual device backup/restore QA and audit remaining storage writes and security vulnerabilities. No production-readiness sign-off yet.
+
+---
+
 # Hishab Sathi engineering session
 
 **20 November 2026 · Dhaka**
