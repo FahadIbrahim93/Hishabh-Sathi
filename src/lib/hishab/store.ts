@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { BooksError, apply, buildOpening, buildReversal, buildStockAdd } from "./engine.ts";
+import { parseBackup } from "./backup.ts";
 import { makeSeed } from "./seed.ts";
 import { takaToPaisa } from "./money.ts";
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
@@ -186,7 +187,8 @@ interface HishabState {
   createBusiness: (name: string, cashPaisa: number) => Promise<void>;
   reverseEntry: (entryId: string, reason: string) => void;
   exportBooks: () => string;
-  importBooks: (json: string) => void;
+  restoring: boolean;
+  importBooks: (source: string | Blob) => Promise<void>;
   resetDemo: () => void;
   dismissToast: () => void;
 }
@@ -407,28 +409,25 @@ export const useHishab = create<HishabState>((set, get) => ({
   exportBooks: () => {
     return JSON.stringify(get().books, null, 2);
   },
-  importBooks: (json) => {
-    let parsed: unknown;
+  restoring: false,
+  importBooks: async (source) => {
+    const { books: previous, restoring, pendingReceipt } = get();
+    if (restoring || pendingReceipt) throw new BooksError("হিসাব সেভ হচ্ছে। একটু পরে চেষ্টা করুন।");
+    set({ restoring: true, toast: null });
     try {
-      parsed = JSON.parse(json);
-    } catch {
-      throw new Error("ভুল ফাইল। এই ব্যাকআপ ফেরায়নি।");
+      const raw = typeof source === "string" ? source : await source.text().catch(() => {
+        throw new BooksError("ব্যাকআপ ফাইলটি পড়া যায়নি।");
+      });
+      const books = parseBackup(raw);
+      const done = persistChain.then(async () => {
+        await writeConfirmedBooks(previous, books);
+        set({ books, saved: true, onboarded: Boolean(books.businessName), toast: "ব্যাকআপ ফেরত আনা হয়েছে" });
+      });
+      persistChain = done.catch(() => undefined);
+      await done;
+    } finally {
+      set({ restoring: false });
     }
-    const books = parsed as Books;
-    if (
-      !books ||
-      books.version !== 1 ||
-      !Array.isArray(books.entries) ||
-      !Array.isArray(books.parties) ||
-      !Array.isArray(books.products) ||
-      typeof books.businessName !== "string"
-    ) {
-      throw new Error("ভুল ফাইল। এই ব্যাকআপ ফেরায়নি।");
-    }
-    set({ books, saved: true, toast: "ব্যাকআপ ফেরত আনা হয়েছে" });
-    persistSafe(books).catch(() =>
-      set({ saved: false, toast: "সেভ হয়নি। আবার চেষ্টা করুন।" }),
-    );
   },
   resetDemo: () => {
     const books = makeSeed();

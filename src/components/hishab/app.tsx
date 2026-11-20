@@ -114,6 +114,7 @@ function Aside() {
 }
 
 function Shell() {
+  const restoring = useHishab((s) => s.restoring);
   const nav = useHishab((s) => s.nav);
   const toast = useHishab((s) => s.toast);
   const dismissToast = useHishab((s) => s.dismissToast);
@@ -127,7 +128,7 @@ function Shell() {
   }, [toast, dismissToast]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-screen={screen.id}>
+    <div className="flex h-full min-h-0 flex-col" data-screen={screen.id} inert={restoring} aria-busy={restoring}>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {screen.id === "home" ? <HomeScreen /> : null}
         {screen.id === "dues" ? <DuesScreen /> : null}

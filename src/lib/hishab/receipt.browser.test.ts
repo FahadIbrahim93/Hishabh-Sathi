@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { chromium } from "playwright";
+import { chromium, type Page } from "playwright";
 import { createServer } from "vite";
 import { expect, it } from "vitest";
 
@@ -25,6 +25,7 @@ const fixture = `<html lang="bn"><body><div id="root"></div><script type="module
       step: "confirm", partyId: "rahim", amountTaka: 600
     }));
   }
+  window.exportTestBooks = () => useHishab.getState().exportBooks();
   window.readReceiptBooks = () => {
     const books = useHishab.getState().books;
     return {
@@ -35,7 +36,7 @@ const fixture = `<html lang="bn"><body><div id="root"></div><script type="module
   createRoot(document.getElementById("root")).render(createElement(HishabApp));
 </script></body></html>`;
 
-it.skipIf(!chrome && !process.env.CI)("retries an aborted device write from the Bangla form and reloads one collection", async () => {
+async function withReceiptPage(run: (page: Page) => Promise<void>) {
   const server = await createServer({
     configFile: false,
     resolve: { alias: { "@": resolve("src") } },
@@ -58,52 +59,105 @@ it.skipIf(!chrome && !process.env.CI)("retries an aborted device write from the 
     try {
       const page = await browser.newPage();
       await page.goto(new URL("/receipt-test", server.resolvedUrls!.local[0]).href);
-      const save = page.getByRole("button", { name: "সেভ করুন", exact: true });
-      await save.waitFor();
-      await page.evaluate(() => {
-        const put = IDBObjectStore.prototype.put;
-        IDBObjectStore.prototype.put = function (...args) {
-          IDBObjectStore.prototype.put = put;
-          const request = put.apply(this, args);
-          this.transaction.abort();
-          return request;
-        };
-      });
-      await save.click();
-      await page.getByText("এই ফোনে সেভ হয়নি। আবার চেষ্টা করুন।", { exact: true }).waitFor();
-      expect(await page.locator('[data-screen="receipt"]').count()).toBe(0);
-      await save.click();
-      await page.locator('[data-screen="receipt"]').waitFor();
-      await page.reload();
-      await page.locator('[data-screen="home"]').waitFor();
-      const result = await page.evaluate("window.readReceiptBooks()");
-      // Seeded Rahim owes ৳8,000. One ৳600 payment leaves ৳7,400.
-      expect(result).toEqual({ entries: 1, due: 740_000 });
-
-      // Reopen the same book with one transient IndexedDB read failure.
-      await page.addInitScript(() => {
-        const get = IDBObjectStore.prototype.get;
-        IDBObjectStore.prototype.get = function (...args) {
-          const request = get.apply(this, args);
-          if (this.name === "books") {
-            IDBObjectStore.prototype.get = get;
-            this.transaction.abort();
-          }
-          return request;
-        };
-      });
-      await page.reload();
-      const retry = page.getByRole("button", { name: "আবার চেষ্টা করুন", exact: true });
-      await retry.waitFor();
-      expect(await page.locator('[data-screen="home"]').count()).toBe(0);
-      expect(await page.getByText("দোকানের নাম", { exact: true }).count()).toBe(0);
-      await retry.click();
-      await page.locator('[data-screen="home"]').waitFor();
-      expect(await page.evaluate("window.readReceiptBooks()")).toEqual(result);
+      await run(page);
     } finally {
       await browser.close();
     }
   } finally {
     await server.close();
   }
-}, 90_000);
+}
+
+const browserTest = it.skipIf(!chrome && !process.env.CI);
+browserTest("retries an aborted device write from the Bangla form and reloads one collection", () => withReceiptPage(async page => {
+  const save = page.getByRole("button", { name: "সেভ করুন", exact: true });
+  await save.waitFor();
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...args) {
+      IDBObjectStore.prototype.put = put;
+      const request = put.apply(this, args);
+      this.transaction.abort();
+      return request;
+    };
+  });
+  await save.click();
+  await page.getByText("এই ফোনে সেভ হয়নি। আবার চেষ্টা করুন।", { exact: true }).waitFor();
+  expect(await page.locator('[data-screen="receipt"]').count()).toBe(0);
+  await save.click();
+  await page.locator('[data-screen="receipt"]').waitFor();
+  await page.reload();
+  await page.locator('[data-screen="home"]').waitFor();
+  const result = await page.evaluate("window.readReceiptBooks()");
+  // Seeded Rahim owes ৳8,000. One ৳600 payment leaves ৳7,400.
+  expect(result).toEqual({ entries: 1, due: 740_000 });
+
+  // Reopen the same book with one transient IndexedDB read failure.
+  await page.addInitScript(() => {
+    const get = IDBObjectStore.prototype.get;
+    IDBObjectStore.prototype.get = function (...args) {
+      const request = get.apply(this, args);
+      if (this.name === "books") {
+        IDBObjectStore.prototype.get = get;
+        this.transaction.abort();
+      }
+      return request;
+    };
+  });
+  await page.reload();
+  const retry = page.getByRole("button", { name: "আবার চেষ্টা করুন", exact: true });
+  await retry.waitFor();
+  expect(await page.locator('[data-screen="home"]').count()).toBe(0);
+  expect(await page.getByText("দোকানের নাম", { exact: true }).count()).toBe(0);
+  await retry.click();
+  await page.locator('[data-screen="home"]').waitFor();
+  expect(await page.evaluate("window.readReceiptBooks()")).toEqual(result);
+}), 90_000);
+
+browserTest("rejects a damaged file, keeps the live ledger on write failure, and restores a valid export", () => withReceiptPage(async page => {
+  const save = page.getByRole("button", { name: "সেভ করুন", exact: true });
+  await save.waitFor();
+  const backup: string = await page.evaluate("window.exportTestBooks()");
+  await save.click();
+  await page.locator('[data-screen="receipt"]').waitFor();
+  const current: string = await page.evaluate("window.exportTestBooks()");
+  const reopen = async () => {
+    await page.reload();
+    await page.locator('[data-screen="home"]').waitFor();
+    return page.evaluate("window.exportTestBooks()");
+  };
+  const choose = async (json: string) => {
+    await page.getByRole("button", { name: "আরও", exact: true }).click();
+    await page.locator('input[type="file"]').setInputFiles({
+      name: "books.json", mimeType: "application/json", buffer: Buffer.from(json),
+    });
+  };
+  const restore = page.getByRole("button", { name: "ফেরত আনুন", exact: true });
+  const damaged = JSON.parse(backup);
+  damaged.entries[0].lines[0].debit += 1;
+  expect(await reopen()).toBe(current);
+  await choose(JSON.stringify(damaged));
+  await restore.click();
+  await page.getByRole("alert").filter({ hasText: "ব্যাকআপ" }).waitFor();
+  expect(await reopen()).toBe(current);
+
+  await choose(backup);
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...args) {
+      IDBObjectStore.prototype.put = put;
+      const request = put.apply(this, args);
+      this.transaction.abort();
+      return request;
+    };
+  });
+  await restore.click();
+  await page.getByRole("alert").filter({ hasText: "সেভ হয়নি" }).waitFor();
+  expect(await reopen()).toBe(current);
+
+  await choose(backup);
+  await restore.click();
+  await page.getByText("ব্যাকআপ ফেরত আনা হয়েছে", { exact: true }).waitFor();
+  expect(await reopen()).toBe(backup);
+  expect(await page.evaluate("window.readReceiptBooks()")).toEqual({ entries: 0, due: 800_000 });
+}), 90_000);

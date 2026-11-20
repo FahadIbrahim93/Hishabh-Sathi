@@ -1,13 +1,23 @@
 # Hishab Sathi engineering session
 
 **20 November 2026 · Dhaka**
+## Manual backup restore · 20 November 2026
+
+**Current task** — The backup restore fix and its tests are in [draft PR #29](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/29), addressing [issue #28](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/28). The PR awaits review and merge.
+
+**Completed.** Manual restore checks the v1 format, catalog and ledger records, references, per-entry journal balance and stock audit before writing. It rejects malformed files with a Bangla error. A valid restore uses one IndexedDB transaction to check the current device books and replace them. Success is shown only after commit. A storage failure leaves the original ledger available, and a stale tab must reopen the current books before restoring.
+
+**Verified.** On the old implementation, 12 regression cases failed. The fixed implementation passed 102 tests, typecheck, lint and build. Lint reported three existing warnings. Chrome rejected a one-paisa discrepancy. After both that rejection and an aborted restore transaction, the full exported ledger still matched the original after reload (one ৳600 collection and ৳7,400 due). A valid earlier export restored the exact earlier ledger with ৳8,000 due. Stock-only transactions, archived parties and v1 data without optional fields also passed. [Failing baseline](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44742003162) · [Passing implementation](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44742487364)
+
+**Next proposed task, awaiting confirmation.** Prevent a second reversal of the same original payment. Verify that retrying a reversal preserves one linked correction and adjusts dues only once after reload.
+
 ## Merge review · 20 November 2026
 
 **Completed.** Reviewed and merged [#24](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/24) at [6d44c5e](https://github.com/FahadIbrahim93/Hishabh-Sathi/commit/6d44c5e08b6302cd0c862fee950e85497ec020c4), then [#26](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/26) at [d11f5ed](https://github.com/FahadIbrahim93/Hishabh-Sathi/commit/d11f5ed5924fd319a9f7eac12215614b10775d02). The branches had no unresolved review threads. The final merged file tree matched the reviewed startup PR. GitHub closed issues #23 and #25.
 
 **Verification.** Typecheck, lint, tests and build passed on both merge commits. The integrated suite passed 85 tests, including the Chrome retry and reload checks. [Receipt merge CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44741139665) · [Startup merge CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44741219243)
 
-**Next task, awaiting approval.** Validate manual backup restore before it can replace existing books. Reject malformed or unbalanced entries, preserve the current ledger through reload, and verify that valid backups still restore.
+**Follow-up selected for the next session.** Validate manual backup restore before it can replace existing books. Reject malformed or unbalanced entries, preserve the current ledger through reload, and verify that valid backups still restore.
 
 ## Startup recovery · 20 November 2026
 
