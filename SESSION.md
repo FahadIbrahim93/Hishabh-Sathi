@@ -1,3 +1,7 @@
+# Hosted CI gate · 21 November 2026
+
+#15 merged via #34. Main passed [dependency and PostgreSQL verification](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834416515) and [CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834416531) on 55feee0. Issue #20 now enforces the lockfile, dependency audit and all four browser scenarios. The audit script lives in the same change as its workflow invocation.
+
 # Dependency verification · 21 November 2026
 
 Catalog issue #32 and PR #33 merged. [Post-merge main CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44833849170) passed for 863149d. Current issue #15 requires a new hosted audit and an isolated PostgreSQL auth schema check. Verify merge CI before proceeding to #20.
