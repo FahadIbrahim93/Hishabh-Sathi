@@ -358,7 +358,7 @@ export function MoreScreen() {
   const [arm, setArm] = useState(false);
   const report = audit(books);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
-  const [restoring, setRestoring] = useState(false);
+  const restoring = useHishab((s) => s.restoring);
   const [restoreError, setRestoreError] = useState("");
 
   const downloadBackup = () => {
@@ -373,22 +373,15 @@ export function MoreScreen() {
     URL.revokeObjectURL(url);
   };
 
-  const doRestore = () => {
-    if (!restoreFile) return;
-    setRestoring(true);
+  const doRestore = async () => {
+    if (!restoreFile || restoring) return;
     setRestoreError("");
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        importBooks(reader.result as string);
-        setRestoreFile(null);
-      } catch (err) {
-        setRestoreError(err instanceof Error ? err.message : "ফেরায়নি।");
-      } finally {
-        setRestoring(false);
-      }
-    };
-    reader.readAsText(restoreFile);
+    try {
+      await importBooks(restoreFile);
+      setRestoreFile(null);
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : "ব্যাকআপ ফেরত আনা যায়নি।");
+    }
   };
 
   return (
@@ -419,7 +412,9 @@ export function MoreScreen() {
                 className="sr-only"
                 onChange={(e) => {
                   const file = e.currentTarget.files?.[0];
+                  setRestoreError("");
                   if (file) setRestoreFile(file);
+                  e.currentTarget.value = "";
                 }}
               />
               ফাইল বেছে নিন
@@ -428,12 +423,12 @@ export function MoreScreen() {
           {restoreFile && (
             <div className="grid grid-cols-2 gap-3">
               <Primary onClick={doRestore} disabled={restoring}>
-                ফেরত আনুন
+                {restoring ? "ফেরত আনা হচ্ছে…" : "ফেরত আনুন"}
               </Primary>
               <Secondary onClick={() => setRestoreFile(null)}>বাতিল</Secondary>
             </div>
           )}
-          {restoreError ? <p className="mt-2 text-sm text-clay">{restoreError}</p> : null}
+          {restoreError ? <p role="alert" className="mt-2 text-sm text-clay">{restoreError}</p> : null}
         </div>
         <h2 className="font-display text-lg font-semibold text-ink mt-8">খাতার ধরন</h2>
         <Choice
