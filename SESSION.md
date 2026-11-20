@@ -1,3 +1,33 @@
+# Dependency audit checkpoint - 20 November 2026
+
+Issue #15. `npm audit` on the lockfile before this branch: **15 advisories - 3 critical, 1 high, 9 moderate, 2 low**. After: **0 - `found 0 vulnerabilities`, exit 0**. Base commit `5445b6a` (stacked on the catalog durability draft), branch `fix/dependency-audit`.
+
+## Critical and high advisories, and how each was closed
+
+| Advisory | Package | Runtime or dev | Patched | Semver-compatible | Resolution |
+| --- | --- | --- | --- | --- | --- |
+| GHSA-965c-763c-88jm (critical, 9.1) OAuth state usable as magic link | `better-auth` | runtime, direct | 1.7.7+ | yes, minor within 1.x once the `~1.6.30` range is opened | upgraded to 1.7.27 |
+| GHSA-r4xp-prcw-77qf (high, 7.4) OAuth Proxy sign-in as another user | `better-auth` | runtime, direct | 1.7.7+ | yes | upgraded to 1.7.27 |
+| GHSA-q84f-53jg-9ppm (high, 8.1) device approval hides client/permissions | `better-auth` | runtime, direct | 1.7.0-rc.3+ | yes | upgraded to 1.7.27 |
+| GHSA-5gmw-xhrv-c9v3 and GHSA-85c8-ppgw-ccpr (critical) tinypool prototype pollution to RCE | `tinypool` | dev, transitive through `vitest` | 2.1.2+ | no, `vitest` 3.2.7 pins tinypool 1.x | upgraded `vitest` 3.2.7 to 5.1.1, which ships tinypool 2.2.0 |
+| GHSA-mrhx-c7xc-m3w5 (high, 7.5) zod memory exhaustion | `zod` | runtime, direct | 4.6.6+ | yes, already inside `^4.4.0` | floor raised to `^4.6.7`, resolved 4.6.7 |
+
+Moderates and lows closed the same way: `@typescript-eslint/*` and `typescript-eslint` (dev, via `minimatch`) by upgrading to 8.73.0; `@vitest/mocker` path traversal (dev) and the two `@better-auth/*` adapter lows by the `vitest` and `better-auth` upgrades; `seroval` (runtime, transitive through `@tanstack/*`) updated 1.6.9 to 1.8.2 inside its existing `^1.6.7` range. No override was used for any advisory, and none is left reachable.
+
+## API adaptation for better-auth 1.7
+
+1.7 removed `genericOAuthClient` and the plugin endpoint `signInWithOAuth2`; generic OAuth providers are now registered as core social providers. `src/lib/auth/client.ts` calls `authClient.signIn.social({ provider })`, and `src/lib/auth/popup.server.ts` calls `auth.api.signInSocial({ body: { provider } })`. The server-side `genericOAuth({ config })` registration typechecked unchanged. No test was modified.
+
+## Verification after the upgrades
+
+`npm ci` 0 - `typecheck` 0 - `lint` 0 (the same 3 pre-existing `react-refresh` warnings, 0 errors) - `npm test` **110/110 in 13 files**, including the three IndexedDB browser specs executing against a real Chromium (9.6s) - `npm run build` 0 - `npm audit` 0, exit 0.
+
+## Still outstanding
+
+- `gh` is unauthenticated in this runner, so issue #15 has to be closed by a maintainer once this draft branch is reviewed; nothing was merged or deployed.
+- Better Auth 1.7 may expect a newer auth schema than `migrations/auth/0001_auth.sql`. Sign-in is off in the shipped config and `DATABASE_URL` is unset locally, so no check here exercises it: regenerate that schema with the Better Auth CLI before enabling sign-in in a deployed environment.
+- CI still installs with `npm install` instead of `npm ci` (#20) and relies on the runner image for Chrome and fonts; the browser specs skip silently if either is missing.
+
 # Integration checkpoint - 20 November 2026
 
 **Post-merge verification of `main` after PR #29 and PR #31: COMPLETED.**
