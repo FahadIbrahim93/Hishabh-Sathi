@@ -1,0 +1,33 @@
+name: Dependency and auth verification
+on:
+  pull_request:
+    branches: [main]
+    paths: ['package*.json', 'migrations/auth/**', 'src/lib/auth/**', 'scripts/check-auth-schema.mjs', '.github/workflows/auth-schema.yml']
+  push:
+    branches: [main]
+    paths: ['package*.json', 'migrations/auth/**', 'src/lib/auth/**', 'scripts/check-auth-schema.mjs', '.github/workflows/auth-schema.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: auth_contract_test
+          POSTGRES_PASSWORD: test-only
+        ports: ['5432/tcp']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-fund --no-audit
+      - run: npm audit --audit-level=low
+      - run: node scripts/check-auth-schema.mjs
+        env:
+          TEST_PG_PORT: ${{ job.services.postgres.ports[5432] }}
