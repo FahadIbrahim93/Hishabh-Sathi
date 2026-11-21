@@ -31,7 +31,7 @@ Five Dependabot PRs, open since 9 Nov: [#2](https://github.com/FahadIbrahim93/Hi
 
 ## Known gaps
 
-- Not an installable PWA yet: no manifest, no service worker ([#17](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/17)).
+- Offline app shell implemented ([#17](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/17)): manifest, maskable icons, versioned service worker, offline page and an honest device-only status strip. Real-device Android installability and a deployed origin are still unverified; see [PWA.md](PWA.md).
 - No server-side ledger tables or sync; only an auth migration exists ([#21](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/21)).
 - Ledger has only example-based tests; property tests are required by CONTRIBUTING ([#18](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/18)).
 - Phase 0 exit gate (10 shop-owner interviews logged) is not met; the README still said "Phase 0 in progress".

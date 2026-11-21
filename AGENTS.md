@@ -53,7 +53,7 @@ On 18 Nov 2026 all four checks passed on `main` (`e5169d3`).
 - Change the ledger model, reversal rule or consignment rule without an ADR and Fahad's approval.
 - Add paid services or enable paid usage. Free tools only.
 - Invent customers, numbers or competitor prices; no degree claims. Public text presents Fahad as the founder and names nobody else.
-- Claim the app syncs, is live or is offline-installable. None of that is true yet.
+- Claim the app syncs or is live, or that it has been installed and verified on a phone. The offline app shell exists (#17, see `docs/PWA.md`) but real-device installability and a deployed origin are unverified.
 
 ---
 

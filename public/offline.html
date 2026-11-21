@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="bn">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0F6B4C" />
+    <title>হিসাব সাথী — অফলাইন</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --palm: #0f6b4c;
+        --palm-deep: #0a4a35;
+        --paper: #f3efe4;
+        --ink: #1c1914;
+        --ink-soft: #5b554a;
+        --saffron: #c47b09;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        background: var(--paper);
+        color: var(--ink);
+        font-family:
+          "Hind Siliguri",
+          "Noto Sans Bengali",
+          "Lohit Bengali",
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        line-height: 1.6;
+      }
+      main {
+        width: 100%;
+        max-width: 26rem;
+      }
+      .mark {
+        width: 3.5rem;
+        height: 0.375rem;
+        border-radius: 999px;
+        background: var(--saffron);
+      }
+      h1 {
+        margin: 1rem 0 0.5rem;
+        font-size: 1.75rem;
+        line-height: 1.25;
+      }
+      p {
+        margin: 0 0 1rem;
+        color: var(--ink-soft);
+      }
+      a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 3rem;
+        padding: 0 1.25rem;
+        border-radius: 0.75rem;
+        background: var(--palm);
+        color: var(--paper);
+        font-weight: 600;
+        text-decoration: none;
+      }
+      a:focus-visible {
+        outline: 3px solid var(--palm-deep);
+        outline-offset: 3px;
+      }
+      footer {
+        margin-top: 2rem;
+        border-top: 1px solid rgba(28, 25, 20, 0.15);
+        padding-top: 1rem;
+        font-size: 0.875rem;
+        color: var(--ink-soft);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark" aria-hidden="true"></div>
+      <h1>এখন ইন্টারনেট নেই</h1>
+      <p>
+        অ্যাপটি এখনও এই ফোনে পুরোপুরি সেভ হয়নি। ইন্টারনেট দিয়ে একবার খুললে এরপর অফলাইনেও খোলা
+        যাবে।
+      </p>
+      <p>আপনার হিসাব এই ফোনেই আছে — ব্রাউজারের ডাটা মুছবেন না।</p>
+      <a href="/">আবার চেষ্টা করুন</a>
+      <footer>হিসাব সাথী — হিসাব শুধু এই ফোনে থাকে, সার্ভারে সিঙ্ক হয় না।</footer>
+    </main>
+  </body>
+</html>

@@ -18,7 +18,7 @@ The differentiator:
 
 ## Tech stack (baseline)
 
-- Client: React app on TanStack Start + TanStack Router, IndexedDB local store. The PWA manifest and service worker are not built yet.
+- Client: React app on TanStack Start + TanStack Router, IndexedDB local store. A web app manifest and a versioned service worker cache the app shell for offline reopen; installability on a real device is not yet verified (see [docs/PWA.md](docs/PWA.md)).
 - Server: TypeScript on Node, Postgres (Kysely), phone + OTP auth (Better Auth)
 - Ledger: append-only events, idempotent `apply`; all money in integer paisa (BDT)
 

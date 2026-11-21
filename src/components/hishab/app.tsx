@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Home, Menu, Package, Wallet } from "lucide-react";
 import { FlowScreen, ReceiptScreen } from "@/components/hishab/flows";
+import { OfflineStatus } from "@/components/hishab/offline-status";
 import { OnboardingScreen } from "@/components/hishab/onboarding";
 import { ReportsScreen } from "@/components/hishab/reports";
 import {
@@ -16,6 +17,7 @@ import {
 } from "@/components/hishab/screens";
 import { balance, collectedBetween, revenueBetween } from "@/lib/hishab/engine";
 import { formatTaka, startOfLocalDay } from "@/lib/hishab/money";
+import { registerServiceWorker } from "@/lib/pwa/register";
 import { useHishab, type TabId } from "@/lib/hishab/store";
 
 const TABS: { id: TabId; label: string; icon: typeof Home }[] = [
@@ -31,6 +33,11 @@ export function HishabApp() {
   const onboarded = useHishab((s) => s.onboarded);
   useEffect(() => {
     useHishab.getState().hydrate();
+  }, []);
+  useEffect(() => {
+    // Production builds only: a dev worker would cache transformed modules.
+    if (!import.meta.env.PROD) return;
+    void registerServiceWorker();
   }, []);
 
   return (
@@ -148,6 +155,7 @@ function Shell() {
           {toast}
         </button>
       ) : null}
+      <OfflineStatus />
       {showTabs ? <Tabs active={screen.id} /> : null}
     </div>
   );

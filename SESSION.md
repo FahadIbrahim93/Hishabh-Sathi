@@ -1,3 +1,34 @@
+# Offline app shell · 21 November 2026
+
+Issue #17. Branch `feat/pwa-offline`, based on `main` at `da0b35d` (after #33, #34 and #40 merged; #42 and #47 open from earlier sessions).
+
+## What changed
+
+- `public/manifest.webmanifest` plus four PNG icons (192/512, `any` and `maskable` with a safe-zone inset), linked from `src/routes/__root.tsx` with the Apple install metadata.
+- `public/sw.js`: versioned (`VERSION`) shell, static and font caches. Install precaches the fixed shell list **and the hashed `/assets/*` scripts, styles and preloads the server-rendered document references**, so the first visit is covered even though the page is not yet controlled. Activation deletes older `hishab-` caches and claims tabs. Navigation is network-first with the cached shell, then `offline.html`, then a Bangla 503. Auth, `/api`, server functions, non-GET, credentialled non-static traffic and `no-store`/`private` responses are never cached.
+- `src/lib/pwa/register.ts` registers `/sw.js` at scope `/` in production builds only and returns `false` instead of throwing, so a blocked worker degrades to online-only rather than breaking the app.
+- `src/components/hishab/offline-status.tsx` is the honest storage status: “শুধু এই ফোনে সেভ · সার্ভারে সিঙ্ক হয় না”, switching to offline wording while `navigator.onLine` is false.
+- `docs/PWA.md`: caching rules, update and rollback (including a kill switch), the data-clearing risk with backup guidance, and what is not verified. README, STATUS and AGENTS now describe the shell accurately.
+
+## Two defects the browser test caught
+
+The real-Chromium spec failed three times before the worker was correct, and both causes would have shipped:
+
+1. **Every asset excluded.** Excluding `credentials: "include"` requests (meant for signed-in data) also excluded browser navigations and same-origin scripts, which are sent credentialled. The rule now applies only to non-static, non-navigation requests.
+2. **Offline modules did not execute.** Asset responses carry `Vary: Origin`; the module request's headers differ from the request that stored the file, so `cache.match` missed and the module fell back to the network. All cache lookups now use `ignoreVary: true`, correct for public immutable assets. A unit test models `Vary` so it cannot regress.
+
+An earlier attempt (warming the cache from the page after activation) was discarded once `ignoreVary` fixed the real cause: install-time precaching is simpler and does not depend on the page running a warm-up loop.
+
+## Verification
+
+- `src/lib/pwa`: **23 tests in 4 files**, including the non-skipping Chromium spec that loads the page, waits for worker control, stops the server, reloads, and asserts the shell and its module run from cache while `/api/private` is absent from every cache and fails offline.
+- Fresh run after a clean `npm ci`: `npm run typecheck` 0 · `npm run lint` 0 errors (the same three pre-existing `react-refresh` warnings) · `npm run test:ci` 0, **141/141 tests in 18 files, 0 skipped, 4 browser specs**, gate line `test gate: ok — 141 passed ... (floor 110)` · `npm run build` 0 (`db:migrate` skipped, `DATABASE_URL` unset) · `npm run audit` 0, `found 0 vulnerabilities`. The build emits `sw.js`, `manifest.webmanifest` and the icons into `.vercel/output/static`.
+
+## Not verified
+
+- Real Android install (install prompt, maskable rendering, safe-area, fonts, storage pressure). No device is available here.
+- A deployed origin: nothing is deployed, and the Vercel build has not served the worker.
+
 # Hosted CI gate · 21 November 2026
 
 #15 merged via #34. Main passed [dependency and PostgreSQL verification](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834416515) and [CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834416531) on 55feee0. Issue #20 now enforces the lockfile, dependency audit and all four browser scenarios. The audit script lives in the same change as its workflow invocation.
