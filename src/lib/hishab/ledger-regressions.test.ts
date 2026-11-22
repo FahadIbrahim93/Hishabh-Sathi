@@ -122,6 +122,41 @@ describe("reports follow the journal", () => {
     assert.equal(row?.days, 90);
     assert.equal(row?.bucket, "30+");
   });
+
+  it("does not let a reversed duplicate sale pay off an older due", () => {
+    let books = shop();
+    books = apply(books, sellTen(books, T0, 0));
+    const duplicate = sellTen(books, T0 + 50 * DAY, 0);
+    books = apply(books, duplicate);
+    books = apply(
+      books,
+      buildReversal({ id: "undo-dup", at: T0 + 51 * DAY, original: duplicate, reason: "twice" }),
+    );
+    const [row] = duesAging(books, T0 + 60 * DAY);
+    assert.equal(row?.receivable, 100_000);
+    assert.equal(row?.days, 60);
+    assert.equal(row?.bucket, "30+");
+  });
+
+  it("does not make a due look new when its collection is reversed", () => {
+    let books = shop();
+    books = apply(books, sellTen(books, T0, 0));
+    const paid = buildCollection(books, {
+      id: "paid",
+      at: T0 + DAY,
+      partyId: "rahim",
+      amountPaisa: 100_000,
+    });
+    books = apply(books, paid);
+    books = apply(
+      books,
+      buildReversal({ id: "undo-paid", at: T0 + 40 * DAY, original: paid, reason: "bounced" }),
+    );
+    const [row] = duesAging(books, T0 + 45 * DAY);
+    assert.equal(row?.receivable, 100_000);
+    assert.equal(row?.days, 45);
+    assert.equal(row?.bucket, "30+");
+  });
 });
 
 describe("reversals and returns cannot both undo one sale", () => {
