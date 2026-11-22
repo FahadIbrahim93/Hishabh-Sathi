@@ -216,13 +216,16 @@ function emptyBooks(): Books {
 let startup: Promise<void> | undefined;
 let persistChain: Promise<unknown> = Promise.resolve();
 
+// The change runs inside the queue, against the books the previous write left,
+// so two quick catalog edits apply in order instead of the second looking stale.
 function commitCatalog(
-  next: Books,
+  change: (books: Books) => Books,
   success: Partial<Pick<HishabState, "toast" | "onboarded" | "nav" | "draft">> = {},
 ): Promise<void> {
-  const previous = useHishab.getState().books;
   const done = persistChain.then(async () => {
+    const previous = useHishab.getState().books;
     try {
+      const next = change(previous);
       await writeConfirmedBooks(previous, next);
       useHishab.setState({ books: next, saved: true, ...success });
     } catch (error) {
@@ -322,8 +325,7 @@ export const useHishab = create<HishabState>((set, get) => ({
       role,
       phone: phone?.trim() || undefined,
     };
-    const books = { ...get().books, parties: [...get().books.parties, party] };
-    await commitCatalog(books);
+    await commitCatalog((books) => ({ ...books, parties: [...books.parties, party] }));
     return id;
   },
   addProduct: async (input) => {
@@ -341,9 +343,10 @@ export const useHishab = create<HishabState>((set, get) => ({
       pricePaisa: takaToPaisa(input.priceTaka),
       costPaisa: takaToPaisa(input.costTaka),
     };
-    let books: Books = { ...get().books, products: [...get().books.products, product] };
-    if (input.qty > 0) {
-      books = apply(
+    await commitCatalog((current) => {
+      const books: Books = { ...current, products: [...current.products, product] };
+      if (input.qty <= 0) return books;
+      return apply(
         books,
         buildStockAdd(books, {
           id: crypto.randomUUID(),
@@ -353,23 +356,26 @@ export const useHishab = create<HishabState>((set, get) => ({
           costPaisa: product.costPaisa,
         }),
       );
-    }
-    await commitCatalog(books, { toast: "মাল যোগ হয়েছে" });
+    }, { toast: "মাল যোগ হয়েছে" });
     return id;
   },
   editParty: (id, patch) => {
     const books = get().books;
     const party = books.parties.find((p) => p.id === id);
     if (!party) throw new Error("দোকান পাওয়া যায়নি।");
-    const next = books.parties.map((p) => (p.id === id ? { ...p, ...patch } : p));
-    return commitCatalog({ ...books, parties: next });
+    return commitCatalog((current) => ({
+      ...current,
+      parties: current.parties.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    }));
   },
   archiveParty: (id) => {
     const books = get().books;
     const party = books.parties.find((p) => p.id === id);
     if (!party) throw new Error("দোকান পাওয়া যায়নি।");
-    const next = books.parties.map((p) => (p.id === id ? { ...p, archived: true } : p));
-    return commitCatalog({ ...books, parties: next });
+    return commitCatalog((current) => ({
+      ...current,
+      parties: current.parties.map((p) => (p.id === id ? { ...p, archived: true } : p)),
+    }));
   },
   editProduct: (id, patch) => {
     const books = get().books;
@@ -378,34 +384,38 @@ export const useHishab = create<HishabState>((set, get) => ({
     if (patch.packSize != null && (!Number.isInteger(patch.packSize) || patch.packSize < 1)) {
       throw new Error("কেসে কত পিস, সেটা বলুন।");
     }
-    const next = books.products.map((p) => {
-      if (p.id !== id) return p;
-      const updated: Product = { ...p, ...patch };
-      if (patch.priceTaka != null) updated.pricePaisa = takaToPaisa(patch.priceTaka);
-      if (patch.costTaka != null) updated.costPaisa = takaToPaisa(patch.costTaka);
-      return updated;
-    });
-    return commitCatalog({ ...books, products: next });
+    const { priceTaka, costTaka, ...rest } = patch;
+    return commitCatalog((current) => ({
+      ...current,
+      products: current.products.map((p) => {
+        if (p.id !== id) return p;
+        const updated: Product = { ...p, ...rest };
+        if (priceTaka != null) updated.pricePaisa = takaToPaisa(priceTaka);
+        if (costTaka != null) updated.costPaisa = takaToPaisa(costTaka);
+        return updated;
+      }),
+    }));
   },
   archiveProduct: (id) => {
     const books = get().books;
     const product = books.products.find((p) => p.id === id);
     if (!product) throw new Error("মাল পাওয়া যায়নি।");
-    const next = books.products.map((p) => (p.id === id ? { ...p, archived: true } : p));
-    return commitCatalog({ ...books, products: next });
+    return commitCatalog((current) => ({
+      ...current,
+      products: current.products.map((p) => (p.id === id ? { ...p, archived: true } : p)),
+    }));
   },
   setMode: (mode) => {
-    const books = { ...get().books, mode };
-    return commitCatalog(books);
+    return commitCatalog((books) => ({ ...books, mode }));
   },
   setOnboarded: (value) => set({ onboarded: value }),
   createBusiness: async (name, cashPaisa) => {
     const trimmed = name.trim();
     if (!trimmed) throw new Error("দোকানের নাম লিখুন।");
-    const books = { ...get().books, businessName: trimmed };
-    let opened = books;
-    if (cashPaisa > 0) {
-      opened = apply(
+    await commitCatalog((current) => {
+      const books = { ...current, businessName: trimmed };
+      if (cashPaisa <= 0) return books;
+      return apply(
         books,
         buildOpening({
           id: `open-${crypto.randomUUID()}`,
@@ -415,8 +425,7 @@ export const useHishab = create<HishabState>((set, get) => ({
           products: [],
         }),
       );
-    }
-    await commitCatalog(opened, { onboarded: true });
+    }, { onboarded: true });
   },
   pendingReversal: null,
   reverseEntry: async (entryId, reason) => {
@@ -481,8 +490,7 @@ export const useHishab = create<HishabState>((set, get) => ({
     }
   },
   resetDemo: () => {
-    const books = makeSeed();
-    return commitCatalog(books, {
+    return commitCatalog(() => makeSeed(), {
       nav: [{ id: "home" }],
       draft: null,
       toast: "ডেমো হিসাব আবার বসানো হয়েছে",

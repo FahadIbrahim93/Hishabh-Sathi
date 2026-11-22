@@ -456,6 +456,8 @@ export function MoreScreen() {
               setArm(true);
               return;
             }
+            // The demo replaces this device's only copy of the books, so hand the owner a backup first.
+            if (books.entries.length > 0) downloadBackup();
             void resetDemo().then(() => setArm(false)).catch(() => undefined);
           }}
           className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-card font-display text-base font-semibold text-clay ring-1 ring-line"

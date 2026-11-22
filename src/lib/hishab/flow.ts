@@ -142,7 +142,7 @@ export function entryFromDraft(books: Books, draft: Draft, id: string, at = Date
       partyId: draft.partyId,
       productId: draft.productId,
       qty: piecesOf(draft, product?.packSize ?? 1),
-      unitPricePaisa: takaToPaisa(draft.unitPriceTaka || Math.round((product?.pricePaisa ?? 0) / 100)),
+      unitPricePaisa: draft.unitPriceTaka ? takaToPaisa(draft.unitPriceTaka) : (product?.pricePaisa ?? 0),
       mode: draft.returnMode,
       reason: draft.expenseLabel || undefined,
     });

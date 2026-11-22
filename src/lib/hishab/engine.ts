@@ -232,6 +232,25 @@ export function apply(books: Books, entry: Entry): Books {
     }
     if (reversalFor(books, original.id)) throw new BooksError("এই হিসাব আগেই বিলোপ করা হয়েছে।");
   }
+  const original = entry.kind === "reversal"
+    ? books.entries.find((row) => row.id === entry.reversesEntryId)
+    : undefined;
+  if (
+    original?.kind === "sale" &&
+    original.partyId &&
+    original.productId &&
+    netSold(books, original.partyId, original.productId) < (original.meta.qty ?? 0)
+  ) {
+    throw new BooksError("এই বিক্রির মাল আগেই ফেরত এসেছে। আগে ফেরতটা বিলোপ করুন।");
+  }
+  if (original) {
+    const cashDelta = entry.lines
+      .filter((row) => row.account === "cash")
+      .reduce((sum, row) => sum + row.debit - row.credit, 0);
+    if (cashDelta < 0 && balance(books, "cash") + cashDelta < 0) {
+      throw new BooksError("এই বিলোপে নগদ শূন্যের নিচে যাবে। আগে নগদ মিলিয়ে নিন।");
+    }
+  }
   finish(entry);
   for (const move of entry.stock) {
     if (move.qtyDelta < 0) {
@@ -256,6 +275,17 @@ export function apply(books: Books, entry: Entry): Books {
     }
   }
   let products = books.products;
+  if (original?.kind === "purchase" && original.productId) {
+    // Undo the moving average that the purchase applied.
+    const qty = original.meta.qty ?? 0;
+    const unit = original.meta.unitPrice ?? 0;
+    const owned = stockTotal(books, original.productId);
+    products = products.map((product) => {
+      if (product.id !== original.productId || owned - qty <= 0) return product;
+      const costPaisa = Math.round((owned * product.costPaisa - qty * unit) / (owned - qty));
+      return { ...product, costPaisa: Math.max(costPaisa, 0) };
+    });
+  }
   if (entry.costUpdate) {
     products = products.map((product) =>
       product.id === entry.costUpdate?.productId
@@ -541,9 +571,11 @@ export function buildConsign(
 }
 
 function netSold(books: Books, partyId: string, productId: string): number {
+  const reversed = new Set(books.entries.map((entry) => entry.reversesEntryId));
   let qty = 0;
   for (const entry of books.entries) {
     if (entry.partyId !== partyId || entry.productId !== productId) continue;
+    if (reversed.has(entry.id)) continue;
     if (entry.kind === "sale") qty += entry.meta.qty ?? 0;
     if (entry.kind === "return" && entry.meta.returnMode === "sold") qty -= entry.meta.qty ?? 0;
   }
@@ -738,33 +770,33 @@ export function collectedBetween(books: Books, start: number, end: number): numb
   let total = 0;
   for (const entry of books.entries) {
     if (entry.at < start || entry.at >= end) continue;
-    if (entry.kind === "sale" || entry.kind === "collection") total += entry.meta.received ?? 0;
-    if (entry.kind === "return") total -= entry.meta.refund ?? 0;
+    const sign = entry.kind === "reversal" ? -1 : 1;
+    const kind = entry.kind === "reversal"
+      ? books.entries.find((row) => row.id === entry.reversesEntryId)?.kind
+      : entry.kind;
+    if (kind === "sale" || kind === "collection") total += sign * (entry.meta.received ?? 0);
+    if (kind === "return") total -= sign * (entry.meta.refund ?? 0);
   }
   return total;
 }
 
-export function cogsBetween(books: Books, start: number, end: number): number {
-  let debit = 0;
+function netDebitBetween(books: Books, account: Account, start: number, end: number): number {
+  let net = 0;
   for (const entry of books.entries) {
     if (entry.at < start || entry.at >= end) continue;
     for (const row of entry.lines) {
-      if (row.account === "cogs") debit += row.debit;
+      if (row.account === account) net += row.debit - row.credit;
     }
   }
-  return debit;
+  return net;
+}
+
+export function cogsBetween(books: Books, start: number, end: number): number {
+  return netDebitBetween(books, "cogs", start, end);
 }
 
 export function expenseBetween(books: Books, start: number, end: number): number {
-  let credit = 0;
-  for (const entry of books.entries) {
-    if (entry.at < start || entry.at >= end) continue;
-    if (entry.kind !== "expense") continue;
-    for (const row of entry.lines) {
-      if (row.account === "expense") credit += row.credit;
-    }
-  }
-  return credit;
+  return netDebitBetween(books, "expense", start, end);
 }
 
 export function profitBetween(books: Books, start: number, end: number): number {
@@ -786,13 +818,23 @@ export function duesAging(books: Books, now = Date.now()): DueAging[] {
     if (party.archived) continue;
     const receivable = balance(books, "receivable", party.id);
     if (receivable <= 0) continue;
-    let lastAt = 0;
-    for (const entry of books.entries) {
-      if (entry.partyId !== party.id) continue;
-      const touchesReceivable = entry.lines.some((row) => row.account === "receivable");
-      if (touchesReceivable && entry.at > lastAt) lastAt = entry.at;
+    // Payments clear the oldest dues first, so age the oldest unpaid one.
+    const owed: { at: number; left: number }[] = [];
+    let paid = 0;
+    for (const entry of [...books.entries].sort((a, b) => a.at - b.at)) {
+      for (const row of entry.lines) {
+        if (row.account !== "receivable" || row.partyId !== party.id) continue;
+        if (row.debit > 0) owed.push({ at: entry.at, left: row.debit });
+        paid += row.credit;
+      }
     }
-    const days = lastAt > 0 ? Math.floor((now - lastAt) / oneDay) : 0;
+    for (const due of owed) {
+      const used = Math.min(due.left, paid);
+      due.left -= used;
+      paid -= used;
+    }
+    const oldest = owed.find((due) => due.left > 0)?.at ?? now;
+    const days = Math.floor((now - oldest) / oneDay);
     let bucket: DueAging["bucket"] = "0-7";
     if (days > 30) bucket = "30+";
     else if (days > 7) bucket = "8-30";

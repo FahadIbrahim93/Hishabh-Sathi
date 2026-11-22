@@ -76,5 +76,9 @@ jobs:
       - name: "Tests (strict: a skipped test fails the job)"
         run: npm run test:ci
 
+      # scripts/*.test.mjs use node:test and sit outside vitest's src/** include.
+      - name: Script tests
+        run: node --test "scripts/*.test.mjs"
+
       - name: Build
         run: npm run build

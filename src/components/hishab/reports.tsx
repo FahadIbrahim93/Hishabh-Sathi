@@ -59,7 +59,7 @@ export function ReportsScreen() {
         <div className="grid grid-cols-2 gap-3 mt-2">
           {moneyCard("আয়", formatTaka(monthRevenue), `এই মাসের (${toBnGrouped(d.getDate())} তারিখ পর্যন্ত)`)}
           {moneyCard("খরচ", formatTaka(monthExpense), "খরচের হিসাব")}
-          {moneyCard("লাভ", formatTaka(monthProfit), "আয় minus খরচ minus মালমতো")}
+          {moneyCard("লাভ", formatTaka(monthProfit), "আয় বাদ খরচ, বাদ বিক্রি হওয়া মালের দাম")}
         </div>
 
         <h2 className="font-display text-lg font-semibold text-ink mt-8">পাওনা বয়স (বাকি বয়স)</h2>

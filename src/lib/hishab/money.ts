@@ -171,7 +171,7 @@ export function formatQty(qty: number, packSize = 1, packName = "কেস"): st
 }
 
 export function takaToPaisa(taka: number): number {
-  return Math.round(taka) * 100;
+  return Math.round(taka * 100);
 }
 
 /*
