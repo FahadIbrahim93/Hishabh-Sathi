@@ -226,15 +226,34 @@ export function formatWhen(ts: number, now = Date.now()): string {
   return `${toBn(d.getDate())} ${MONTHS[d.getMonth()]}`;
 }
 
-export function normalizeText(input: string): string {
+/*
+ * ড়, ঢ় and য় each have two encodings: one precomposed code point, or the base
+ * letter plus the nukta sign U+09BC. Unicode NFC always produces the second
+ * (the precomposed letters are composition exclusions), so text from a speech
+ * engine or a normalising keyboard arrives decomposed while every word this
+ * app matches against is written precomposed. Fold to the precomposed form.
+ */
+function foldNukta(input: string): string {
   return input
+    .replace(/\u09A1\u09BC/g, "\u09DC") // ড + nukta -> ড়
+    .replace(/\u09A2\u09BC/g, "\u09DD") // ঢ + nukta -> ঢ়
+    .replace(/\u09AF\u09BC/g, "\u09DF"); // য + nukta -> য়
+}
+
+export function normalizeText(input: string): string {
+  return foldNukta(input)
     .replace(/[০-৯]/g, (ch) => String(ch.charCodeAt(0) - 0x09e6))
     .replace(/[।,.!?;:،"'“”]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-type Phrase = { text: string; value: number };
+/*
+ * `unit` is the place value the phrase counts in: 1 for "তিন", 100 for
+ * "তিনশ", 1000 for "তিন হাজার". "সাড়ে" adds half of it. A bare "হাজার" has
+ * no count, so it has no unit and "সাড়ে হাজার" is not read as a number.
+ */
+type Phrase = { text: string; value: number; unit?: number };
 
 let phraseCache: Phrase[] | null = null;
 
@@ -243,19 +262,109 @@ function phrases(): Phrase[] {
   const list: Phrase[] = [];
   for (let n = 1; n <= 99; n += 1) {
     const w = N99[n]!;
-    list.push({ text: `${w} লাখ`, value: n * 100_000 });
-    list.push({ text: `${w} হাজার`, value: n * 1000 });
-    list.push({ text: w, value: n });
+    list.push({ text: `${w} লাখ`, value: n * 100_000, unit: 100_000 });
+    list.push({ text: `${w} হাজার`, value: n * 1000, unit: 1000 });
+    list.push({ text: w, value: n, unit: 1 });
   }
   for (let h = 1; h <= 9; h += 1) {
     const stem = h === 1 ? "একশ" : `${N99[h]}শ`;
-    list.push({ text: `${stem}ো`, value: h * 100 });
-    list.push({ text: stem, value: h * 100 });
+    list.push({ text: `${stem}ো`, value: h * 100, unit: 100 });
+    list.push({ text: stem, value: h * 100, unit: 100 });
   }
-  list.push({ text: "লাখ", value: 100_000 }, { text: "হাজার", value: 1000 }, { text: "শত", value: 100 });
+  list.push(
+    { text: "লাখ", value: 100_000 },
+    { text: "হাজার", value: 1000 },
+    { text: "শত", value: 100 },
+  );
   list.sort((a, b) => b.text.length - a.text.length || b.value - a.value);
   phraseCache = list;
   return list;
+}
+
+/* Spoken multipliers that follow a count after a space: "৩ হাজার", "দেড় লাখ". */
+const SPACED_UNITS: [string, number][] = [
+  ["লাখ", 100_000],
+  ["হাজার", 1000],
+];
+/* The hundred suffix joins its count: "দেড়শ", "আড়াইশো". Longest first. */
+const HUNDRED_SUFFIXES = ["শো", "শ"];
+/* One and a half, two and a half: they multiply the unit that follows. */
+const HALF_WORDS: [string, number][] = [
+  ["\u09A6\u09C7\u09DC", 1.5], // দেড়
+  ["\u0986\u09DC\u09BE\u0987", 2.5], // আড়াই
+];
+/* "সাড়ে" adds a half to the count after it: সাড়ে তিন হাজার is 3,500. */
+const SARE = "\u09B8\u09BE\u09DC\u09C7"; // সাড়ে
+
+type Match = { value: number; unit?: number; end: number };
+
+function wordEndsAt(text: string, end: number): boolean {
+  return !isBengali(text[end]);
+}
+
+function spacedUnitAt(text: string, from: number): { unit: number; end: number } | null {
+  const space = /^\s*/.exec(text.slice(from))![0].length;
+  for (const [word, unit] of SPACED_UNITS) {
+    const end = from + space + word.length;
+    if (text.startsWith(word, from + space) && wordEndsAt(text, end)) return { unit, end };
+  }
+  return null;
+}
+
+/* A plain count at `i`: digits (optionally times হাজার/লাখ) or a number phrase. */
+function countAt(text: string, i: number): Match | null {
+  if (isBengali(text[i - 1])) return null;
+  const digit = /^[0-9]+/.exec(text.slice(i));
+  if (digit) {
+    const end = i + digit[0].length;
+    const n = Number(digit[0]);
+    for (const suffix of HUNDRED_SUFFIXES) {
+      const after = end + suffix.length;
+      if (text.startsWith(suffix, end) && wordEndsAt(text, after)) {
+        return { value: n * 100, unit: 100, end: after };
+      }
+    }
+    const unit = spacedUnitAt(text, end);
+    if (unit) return { value: n * unit.unit, unit: unit.unit, end: unit.end };
+    return { value: n, unit: 1, end };
+  }
+  for (const phrase of phrases()) {
+    if (!text.startsWith(phrase.text, i)) continue;
+    if (!wordEndsAt(text, i + phrase.text.length)) continue;
+    return { value: phrase.value, unit: phrase.unit, end: i + phrase.text.length };
+  }
+  return null;
+}
+
+/* "দেড়", "দেড়শ", "দেড় হাজার", and the same for আড়াই. */
+function halfWordAt(text: string, i: number): Match | null {
+  if (isBengali(text[i - 1])) return null;
+  for (const [word, factor] of HALF_WORDS) {
+    if (!text.startsWith(word, i)) continue;
+    const after = i + word.length;
+    for (const suffix of HUNDRED_SUFFIXES) {
+      const end = after + suffix.length;
+      if (text.startsWith(suffix, after) && wordEndsAt(text, end)) {
+        return { value: factor * 100, end };
+      }
+    }
+    if (!wordEndsAt(text, after)) continue;
+    const unit = spacedUnitAt(text, after);
+    if (unit) return { value: factor * unit.unit, end: unit.end };
+    return { value: factor, end: after };
+  }
+  return null;
+}
+
+/* "সাড়ে" + a count: half of the count's unit on top of it. */
+function sareAt(text: string, i: number): Match | null {
+  if (isBengali(text[i - 1]) || !text.startsWith(SARE, i)) return null;
+  const after = i + SARE.length;
+  const space = /^\s+/.exec(text.slice(after));
+  if (!space) return null;
+  const count = countAt(text, after + space[0].length);
+  if (!count?.unit) return null;
+  return { value: count.value + count.unit / 2, end: count.end };
 }
 
 function isBengali(ch: string | undefined): boolean {
@@ -270,28 +379,20 @@ export interface AmountHit {
   end: number;
 }
 
+/*
+ * Find the amounts in `text`, which must already be through normalizeText
+ * (ASCII digits, precomposed ড়/য়). A value can be fractional — "সাড়ে তিন"
+ * is 3.5 — and callers decide whether a fraction is acceptable where they
+ * use it; this function never rounds.
+ */
 export function scanAmounts(text: string): AmountHit[] {
   const raw: AmountHit[] = [];
-  const dict = phrases();
   let i = 0;
   while (i < text.length) {
-    const digit = /^[0-9]+/.exec(text.slice(i));
-    if (digit && !isBengali(text[i - 1])) {
-      raw.push({ value: Number(digit[0]), start: i, end: i + digit[0].length });
-      i += digit[0].length;
-      continue;
-    }
-    let hit: Phrase | null = null;
-    for (const phrase of dict) {
-      if (!text.startsWith(phrase.text, i)) continue;
-      if (isBengali(text[i - 1])) continue;
-      if (isBengali(text[i + phrase.text.length])) continue;
-      hit = phrase;
-      break;
-    }
+    const hit = sareAt(text, i) ?? halfWordAt(text, i) ?? countAt(text, i);
     if (hit) {
-      raw.push({ value: hit.value, start: i, end: i + hit.text.length });
-      i += hit.text.length;
+      raw.push({ value: hit.value, start: i, end: hit.end });
+      i = hit.end;
       continue;
     }
     i += 1;

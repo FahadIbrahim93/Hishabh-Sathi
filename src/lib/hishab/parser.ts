@@ -34,6 +34,17 @@ const PAID = /দিয়েছি|দিয়েছি|দিছি/;
 export function parseUtterance(input: string, books: Books): ParseResult {
   const text = normalizeText(input);
   const notes: string[] = [];
+  // "সাড়ে তিন টাকা" or "দেড় কেস" is not a whole taka or a whole count. A
+  // spoken draft never guesses: rounding it, or dropping it and reading the
+  // next number instead, would put a wrong figure in front of the owner.
+  if (scanAmounts(text).some((hit) => !Number.isInteger(hit.value))) {
+    return {
+      kind: null,
+      notes: [
+        "ভগ্নাংশ (যেমন সাড়ে তিন, দেড়) ভয়েসে নেওয়া হয় না। পুরো সংখ্যায় বলুন, বা ফর্মে লিখুন।",
+      ],
+    };
+  }
   if (!text) {
     return { kind: null, notes: ["কী হয়েছে, এক লাইনে বলুন।"] };
   }
@@ -83,7 +94,9 @@ export function parseUtterance(input: string, books: Books): ParseResult {
 
   const party = findParty(
     text,
-    books.parties.filter((item) => item.role === "customer" || kind === "purchase" || kind === "payment"),
+    books.parties.filter(
+      (item) => item.role === "customer" || kind === "purchase" || kind === "payment",
+    ),
   );
   const product = findProduct(text, books.products);
   const qty = findQty(text);
@@ -220,7 +233,9 @@ export function draftFromParse(text: string, result: ParseResult, books: Books):
 
 function findParty(text: string, parties: Party[]): Party | undefined {
   const ranked = parties
-    .flatMap((party) => [party.name, ...party.aliases].map((alias) => ({ party, alias: normalizeText(alias) })))
+    .flatMap((party) =>
+      [party.name, ...party.aliases].map((alias) => ({ party, alias: normalizeText(alias) })),
+    )
     .filter((item) => item.alias.length >= 2)
     .sort((a, b) => b.alias.length - a.alias.length);
   return ranked.find((item) => text.includes(item.alias))?.party;
