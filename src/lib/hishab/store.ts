@@ -184,7 +184,10 @@ interface HishabState {
   commitEntry: (entry: Entry) => Promise<void>;
   addParty: (name: string, role: Party["role"], phone?: string) => Promise<string>;
   addProduct: (input: NewProduct) => Promise<string>;
-  editParty: (id: string, patch: { name?: string; phone?: string; role?: Party["role"] }) => Promise<void>;
+  editParty: (
+    id: string,
+    patch: { name?: string; phone?: string; role?: Party["role"] },
+  ) => Promise<void>;
   archiveParty: (id: string) => Promise<void>;
   editProduct: (
     id: string,
@@ -252,7 +255,6 @@ export const useHishab = create<HishabState>((set, get) => ({
     if (startup) return startup;
     startup = loadDeviceBooks()
       .then((books) => {
-
         set({ books, ready: true, saved: true, onboarded: Boolean(books.businessName) });
       })
       .catch(() => set({ startupFailed: true }))
@@ -343,20 +345,23 @@ export const useHishab = create<HishabState>((set, get) => ({
       pricePaisa: takaToPaisa(input.priceTaka),
       costPaisa: takaToPaisa(input.costTaka),
     };
-    await commitCatalog((current) => {
-      const books: Books = { ...current, products: [...current.products, product] };
-      if (input.qty <= 0) return books;
-      return apply(
-        books,
-        buildStockAdd(books, {
-          id: crypto.randomUUID(),
-          at: Date.now(),
-          productId: id,
-          qty: input.qty,
-          costPaisa: product.costPaisa,
-        }),
-      );
-    }, { toast: "মাল যোগ হয়েছে" });
+    await commitCatalog(
+      (current) => {
+        const books: Books = { ...current, products: [...current.products, product] };
+        if (input.qty <= 0) return books;
+        return apply(
+          books,
+          buildStockAdd(books, {
+            id: crypto.randomUUID(),
+            at: Date.now(),
+            productId: id,
+            qty: input.qty,
+            costPaisa: product.costPaisa,
+          }),
+        );
+      },
+      { toast: "মাল যোগ হয়েছে" },
+    );
     return id;
   },
   editParty: (id, patch) => {
@@ -412,20 +417,23 @@ export const useHishab = create<HishabState>((set, get) => ({
   createBusiness: async (name, cashPaisa) => {
     const trimmed = name.trim();
     if (!trimmed) throw new Error("দোকানের নাম লিখুন।");
-    await commitCatalog((current) => {
-      const books = { ...current, businessName: trimmed };
-      if (cashPaisa <= 0) return books;
-      return apply(
-        books,
-        buildOpening({
-          id: `open-${crypto.randomUUID()}`,
-          at: Date.now(),
-          cashPaisa,
-          stock: [],
-          products: [],
-        }),
-      );
-    }, { onboarded: true });
+    await commitCatalog(
+      (current) => {
+        const books = { ...current, businessName: trimmed };
+        if (cashPaisa <= 0) return books;
+        return apply(
+          books,
+          buildOpening({
+            id: `open-${crypto.randomUUID()}`,
+            at: Date.now(),
+            cashPaisa,
+            stock: [],
+            products: [],
+          }),
+        );
+      },
+      { onboarded: true },
+    );
   },
   pendingReversal: null,
   reverseEntry: async (entryId, reason) => {

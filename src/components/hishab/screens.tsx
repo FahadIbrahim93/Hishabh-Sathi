@@ -11,10 +11,33 @@ import {
   Store,
   Undo2,
 } from "lucide-react";
-import { Callout, Choice, Page, Primary, ScreenHeader, Secondary, TextField } from "@/components/hishab/bits";
+import {
+  Callout,
+  Choice,
+  Page,
+  Primary,
+  ScreenHeader,
+  Secondary,
+  TextField,
+} from "@/components/hishab/bits";
 import { beginDraft } from "@/components/hishab/flows";
-import { audit, balance, collectedBetween, explain, productsAt, revenueBetween, reversalFor, stockAt } from "@/lib/hishab/engine";
-import { formatQty, formatTaka, formatWhen, parseAmount, startOfLocalDay } from "@/lib/hishab/money";
+import {
+  audit,
+  balance,
+  collectedBetween,
+  explain,
+  productsAt,
+  revenueBetween,
+  reversalFor,
+  stockAt,
+} from "@/lib/hishab/engine";
+import {
+  formatQty,
+  formatTaka,
+  formatWhen,
+  parseAmount,
+  startOfLocalDay,
+} from "@/lib/hishab/money";
 import { draftFromParse, parseUtterance, SAMPLES } from "@/lib/hishab/parser";
 import { firstGap } from "@/lib/hishab/flow";
 import { useHishab } from "@/lib/hishab/store";
@@ -41,7 +64,10 @@ export function HomeScreen() {
   const [error, setError] = useState("");
 
   const lighter = books.products.find((product) => product.id === "lighter") ?? books.products[0];
-  const recent = books.entries.filter((entry) => entry.kind !== "opening").slice(-4).reverse();
+  const recent = books.entries
+    .filter((entry) => entry.kind !== "opening")
+    .slice(-4)
+    .reverse();
   const actions =
     books.mode === "stock"
       ? [
@@ -95,7 +121,8 @@ export function HomeScreen() {
           </div>
           {lighter ? (
             <p className="mt-2 text-sm text-ink-soft">
-              গুদামে {lighter.name} {formatQty(stockAt(books, lighter.id, WAREHOUSE), lighter.packSize, lighter.packName)}
+              গুদামে {lighter.name}{" "}
+              {formatQty(stockAt(books, lighter.id, WAREHOUSE), lighter.packSize, lighter.packName)}
             </p>
           ) : null}
         </section>
@@ -114,7 +141,9 @@ export function HomeScreen() {
                   <action.icon className="size-6" aria-hidden="true" />
                 </span>
                 <span>
-                  <span className="block font-display text-lg font-semibold leading-tight text-ink">{action.label}</span>
+                  <span className="block font-display text-lg font-semibold leading-tight text-ink">
+                    {action.label}
+                  </span>
                   <span className="mt-0.5 block text-xs text-ink-soft">{action.hint}</span>
                 </span>
               </button>
@@ -202,16 +231,24 @@ export function HomeScreen() {
 
 function Stat({ label, value, due }: { label: string; value: string; due?: boolean }) {
   return (
-    <div className={`rounded-2xl px-2 py-3 ${due ? "bg-clay-soft ring-1 ring-clay" : "bg-card ring-1 ring-line"}`}>
+    <div
+      className={`rounded-2xl px-2 py-3 ${due ? "bg-clay-soft ring-1 ring-clay" : "bg-card ring-1 ring-line"}`}
+    >
       <p className="text-xs text-ink-soft">{label}</p>
-      <p className="mt-1 font-display text-base font-semibold leading-tight text-ink tabular-nums">{value}</p>
+      <p className="mt-1 font-display text-base font-semibold leading-tight text-ink tabular-nums">
+        {value}
+      </p>
     </div>
   );
 }
 
 function Sample({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="min-h-12 shrink-0 rounded-full bg-palm-deep px-4 text-sm font-semibold text-paper">
+    <button
+      type="button"
+      onClick={onClick}
+      className="min-h-12 shrink-0 rounded-full bg-palm-deep px-4 text-sm font-semibold text-paper"
+    >
       {label}
     </button>
   );
@@ -230,16 +267,25 @@ export function DuesScreen() {
     <div>
       <header className="bg-palm px-4 pt-5 pb-4 text-paper">
         <h1 className="font-display text-3xl font-semibold">বাকি</h1>
-        <p className="mt-1 text-sm text-foam">মোট পাওনা {formatTaka(balance(books, "receivable"))}</p>
+        <p className="mt-1 text-sm text-foam">
+          মোট পাওনা {formatTaka(balance(books, "receivable"))}
+        </p>
       </header>
       <Page>
-        {owing.length === 0 ? <Callout title="পাওনা নেই" body="সব দোকানের বাকি শোধ। নতুন বিক্রি বাকিতে গেলে এখানে আসবে।" /> : null}
+        {owing.length === 0 ? (
+          <Callout
+            title="পাওনা নেই"
+            body="সব দোকানের বাকি শোধ। নতুন বিক্রি বাকিতে গেলে এখানে আসবে।"
+          />
+        ) : null}
         {owing.map(({ party, due }) => (
           <div key={party.id} className="rounded-2xl bg-card p-4 ring-1 ring-line">
             <p className="font-display text-lg font-semibold text-ink">{party.name}</p>
             <p className="mt-1 text-sm text-ink">পাওনা {formatTaka(due)}</p>
             <div className="mt-3">
-              <Primary onClick={() => open("collection", { partyId: party.id })}>টাকা পেয়েছি</Primary>
+              <Primary onClick={() => open("collection", { partyId: party.id })}>
+                টাকা পেয়েছি
+              </Primary>
             </div>
           </div>
         ))}
@@ -275,7 +321,9 @@ export function StockScreen() {
           return (
             <article key={product.id} className="rounded-2xl bg-card p-4 ring-1 ring-line">
               <h2 className="font-display text-xl font-semibold text-ink">{product.name}</h2>
-              <p className="mt-1 text-sm text-ink-soft">প্রতি পিস {formatTaka(product.pricePaisa)}</p>
+              <p className="mt-1 text-sm text-ink-soft">
+                প্রতি পিস {formatTaka(product.pricePaisa)}
+              </p>
               <p className="mt-3 text-base text-ink">
                 গুদামে {formatQty(warehouse, product.packSize, product.packName)}
               </p>
@@ -283,7 +331,8 @@ export function StockScreen() {
                 <ul className="mt-2 flex flex-col gap-1">
                   {held.map((row) => (
                     <li key={row.party.id} className="text-sm text-ink">
-                      {row.party.name} · রাখা মাল {formatQty(row.qty, product.packSize, product.packName)}
+                      {row.party.name} · রাখা মাল{" "}
+                      {formatQty(row.qty, product.packSize, product.packName)}
                     </li>
                   ))}
                 </ul>
@@ -294,7 +343,9 @@ export function StockScreen() {
           );
         })}
         <Secondary onClick={() => open("purchase")}>মাল এনেছি</Secondary>
-        <Secondary onClick={() => setAdding((value) => !value)}>{adding ? "বন্ধ করুন" : "নতুন মাল"}</Secondary>
+        <Secondary onClick={() => setAdding((value) => !value)}>
+          {adding ? "বন্ধ করুন" : "নতুন মাল"}
+        </Secondary>
         {adding ? (
           <div className="flex flex-col gap-3 rounded-2xl bg-card p-4 ring-1 ring-line">
             <TextField label="মালের নাম" value={name} onChange={setName} />
@@ -393,8 +444,12 @@ export function MoreScreen() {
       <Page>
         <div className="rounded-2xl bg-card p-4 ring-1 ring-line">
           <p className="text-sm text-ink-soft">নগদ</p>
-          <p className="font-display text-3xl font-semibold text-ink">{formatTaka(balance(books, "cash"))}</p>
-          <p className="mt-2 text-sm text-ink">{report.ok ? "প্রতিটি হিসাবের দুই দিক মিলেছে।" : "হিসাবে গরমিল। নতুন হিসাব বন্ধ রাখুন।"}</p>
+          <p className="font-display text-3xl font-semibold text-ink">
+            {formatTaka(balance(books, "cash"))}
+          </p>
+          <p className="mt-2 text-sm text-ink">
+            {report.ok ? "প্রতিটি হিসাবের দুই দিক মিলেছে।" : "হিসাবে গরমিল। নতুন হিসাব বন্ধ রাখুন।"}
+          </p>
         </div>
         <h2 className="font-display text-lg font-semibold text-ink mt-8">ব্যাকআপ ও ফেরত আনা</h2>
         <div className="rounded-2xl bg-card p-4 ring-1 ring-line">
@@ -402,9 +457,7 @@ export function MoreScreen() {
             পুরো খাতা একটি ফাইলে সেভ রাখুন। ব্রাউজার মুছে গেলেও এই ফাইল দিয়ে ফেরত আনতে পারবেন।
           </p>
           <div className="grid grid-cols-2 gap-3 mb-3">
-            <Primary onClick={downloadBackup}>
-              ব্যাকআপ নিন
-            </Primary>
+            <Primary onClick={downloadBackup}>ব্যাকআপ নিন</Primary>
             <label className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-line bg-card font-display text-base font-semibold text-ink ring-1 ring-line cursor-pointer">
               <input
                 type="file"
@@ -428,26 +481,38 @@ export function MoreScreen() {
               <Secondary onClick={() => setRestoreFile(null)}>বাতিল</Secondary>
             </div>
           )}
-          {restoreError ? <p role="alert" className="mt-2 text-sm text-clay">{restoreError}</p> : null}
+          {restoreError ? (
+            <p role="alert" className="mt-2 text-sm text-clay">
+              {restoreError}
+            </p>
+          ) : null}
         </div>
         <h2 className="font-display text-lg font-semibold text-ink mt-8">খাতার ধরন</h2>
         <Choice
           title="সহজ খাতা"
           detail="বিক্রি, টাকা, খরচ। মালের তালিকা ছাড়াই।"
           selected={books.mode === "khata"}
-          onClick={() => { void setMode("khata").catch(() => undefined); }}
+          onClick={() => {
+            void setMode("khata").catch(() => undefined);
+          }}
         />
         <Choice
           title="মাল ও বিতরণ"
           detail="কেস, গুদাম, দোকানে রাখা মাল।"
           selected={books.mode === "stock"}
-          onClick={() => { void setMode("stock").catch(() => undefined); }}
+          onClick={() => {
+            void setMode("stock").catch(() => undefined);
+          }}
         />
         <Secondary onClick={() => open("expense")}>খরচ করেছি</Secondary>
         <Secondary onClick={() => push({ id: "report" })}>পুরো হিসাব</Secondary>
         <Secondary onClick={() => push({ id: "guide" })}>কীভাবে হিসাব হয়</Secondary>
         {arm ? (
-          <Callout tone="warn" title="ডেমো আবার শুরু?" body="আপনার নতুন হিসাব মুছে রফিক ট্রেডার্সের আগের খাতা বসবে।" />
+          <Callout
+            tone="warn"
+            title="ডেমো আবার শুরু?"
+            body="আপনার নতুন হিসাব মুছে রফিক ট্রেডার্সের আগের খাতা বসবে।"
+          />
         ) : null}
         <button
           type="button"
@@ -458,7 +523,9 @@ export function MoreScreen() {
             }
             // The demo replaces this device's only copy of the books, so hand the owner a backup first.
             if (books.entries.length > 0) downloadBackup();
-            void resetDemo().then(() => setArm(false)).catch(() => undefined);
+            void resetDemo()
+              .then(() => setArm(false))
+              .catch(() => undefined);
           }}
           className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-card font-display text-base font-semibold text-clay ring-1 ring-line"
         >
@@ -479,7 +546,9 @@ export function VisitScreen() {
     <div>
       <ScreenHeader title="দোকান ভিজিট" onBack={back} />
       <Page>
-        <p className="text-sm leading-relaxed text-ink-soft">আগে দোকান, তারপর বিক্রি, আদায়, মাল রাখা বা ফেরত।</p>
+        <p className="text-sm leading-relaxed text-ink-soft">
+          আগে দোকান, তারপর বিক্রি, আদায়, মাল রাখা বা ফেরত।
+        </p>
         {customers.map((party) => {
           const due = balance(books, "receivable", party.id);
           const held = productsAt(books, partyLoc(party.id));
@@ -518,7 +587,9 @@ export function ShopScreen({ partyId }: { partyId: string }) {
     <div>
       <ScreenHeader title={party.name} onBack={back} />
       <Page>
-        <div className={`rounded-2xl px-4 py-3 ${due > 0 ? "bg-clay-soft ring-1 ring-clay" : "bg-card ring-1 ring-line"}`}>
+        <div
+          className={`rounded-2xl px-4 py-3 ${due > 0 ? "bg-clay-soft ring-1 ring-clay" : "bg-card ring-1 ring-line"}`}
+        >
           <p className="text-sm text-ink-soft">পাওনা</p>
           <p className="font-display text-3xl font-semibold text-ink">{formatTaka(due)}</p>
         </div>
@@ -527,16 +598,33 @@ export function ShopScreen({ partyId }: { partyId: string }) {
             <p className="font-display text-base font-semibold text-ink">দোকানে রাখা মাল</p>
             {held.map((row) => (
               <p key={row.product.id} className="mt-1 text-sm text-ink">
-                {row.product.name} · {formatQty(row.qty, row.product.packSize, row.product.packName)}
+                {row.product.name} ·{" "}
+                {formatQty(row.qty, row.product.packSize, row.product.packName)}
               </p>
             ))}
             <p className="mt-2 text-sm text-ink-soft">এটা এখনও আপনার মাল। বিক্রি ধরা হয়নি।</p>
           </div>
         ) : null}
-        <Choice title="বিক্রি করেছি" detail="গুদাম থেকে মাল কমবে" onClick={() => open("sale", { partyId })} />
-        <Choice title="টাকা পেয়েছি" detail="পুরনো বাকি, নতুন বিক্রি নয়" onClick={() => open("collection", { partyId })} />
-        <Choice title="মাল রেখেছি" detail="বিক্রি নয়" onClick={() => open("consign", { partyId })} />
-        <Choice title="মাল ফেরত" detail="বিক্রি বা রাখা মাল" onClick={() => open("return", { partyId })} />
+        <Choice
+          title="বিক্রি করেছি"
+          detail="গুদাম থেকে মাল কমবে"
+          onClick={() => open("sale", { partyId })}
+        />
+        <Choice
+          title="টাকা পেয়েছি"
+          detail="পুরনো বাকি, নতুন বিক্রি নয়"
+          onClick={() => open("collection", { partyId })}
+        />
+        <Choice
+          title="মাল রেখেছি"
+          detail="বিক্রি নয়"
+          onClick={() => open("consign", { partyId })}
+        />
+        <Choice
+          title="মাল ফেরত"
+          detail="বিক্রি বা রাখা মাল"
+          onClick={() => open("return", { partyId })}
+        />
         {held.length ? (
           <Choice
             title="রাখা মাল বিক্রি"
@@ -567,7 +655,11 @@ export function LedgerScreen() {
       <Page>
         <Callout
           title={report.ok ? "হিসাব মিলেছে" : "হিসাবে গরমিল"}
-          body={report.ok ? "জমা আর খরচের দুই দিক সমান। কোনো হিসাব আধাআধি সেভ হয় না।" : "খাতা বন্ধ করে আবার দেখুন।"}
+          body={
+            report.ok
+              ? "জমা আর খরচের দুই দিক সমান। কোনো হিসাব আধাআধি সেভ হয় না।"
+              : "খাতা বন্ধ করে আবার দেখুন।"
+          }
           tone={report.ok ? "info" : "warn"}
         />
         {rows.map((entry) => (
@@ -618,9 +710,7 @@ export function EntryScreen({ entryId }: { entryId: string }) {
       setReason("");
       back();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "হিসাব বিলোপ করতে পারিনি।",
-      );
+      setError(err instanceof Error ? err.message : "হিসাব বিলোপ করতে পারিনি।");
     } finally {
       setReversing(false);
     }
@@ -635,7 +725,9 @@ export function EntryScreen({ entryId }: { entryId: string }) {
           {view.rows.map((row) => (
             <p key={row.k} className="flex items-baseline justify-between gap-3 py-1">
               <span className="text-sm text-ink-soft">{row.k}</span>
-              <span className="text-right font-display text-lg font-semibold text-ink">{row.v}</span>
+              <span className="text-right font-display text-lg font-semibold text-ink">
+                {row.v}
+              </span>
             </p>
           ))}
         </div>
@@ -654,7 +746,11 @@ export function EntryScreen({ entryId }: { entryId: string }) {
                 বিলোপ করুন
               </Primary>
             </div>
-            {error ? <p role="alert" className="text-sm text-clay">{error}</p> : null}
+            {error ? (
+              <p role="alert" className="text-sm text-clay">
+                {error}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </Page>
@@ -670,7 +766,10 @@ export function GuideScreen() {
     ["রাখা মাল বিক্রি নয়", "দোকানে মাল রেখে এলে সেটা এখনও আপনার। পাওনা বাড়ে না।"],
     ["পুরনো বাকি আলাদা", "টাকা পেলে সেটা নতুন বিক্রি নয়। শুধু আগের পাওনা কমে।"],
     ["মাল না থাকলে সেভ নয়", "এই ফোনের গুদামে যত আছে, তার বেশি বিক্রি হবে না।"],
-    ["ফোনে থাকে", "ইন্টারনেট না থাকলেও হিসাব এই ফোনে সেভ হয়। ব্রাউজারের ডাটা মুছলে হিসাব যেতে পারে।"],
+    [
+      "ফোনে থাকে",
+      "ইন্টারনেট না থাকলেও হিসাব এই ফোনে সেভ হয়। ব্রাউজারের ডাটা মুছলে হিসাব যেতে পারে।",
+    ],
   ];
   return (
     <div>
@@ -684,7 +783,8 @@ export function GuideScreen() {
         ))}
         <p className="flex items-start gap-2 text-sm text-ink-soft">
           <BookOpen className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          রফিক ট্রেডার্সের ডেমোতে লাইটার আছে, কেসে ৫০ পিস, প্রতি পিস ১০ টাকা। রহিম স্টোরের বাক্যটা চেপে দেখুন।
+          রফিক ট্রেডার্সের ডেমোতে লাইটার আছে, কেসে ৫০ পিস, প্রতি পিস ১০ টাকা। রহিম স্টোরের বাক্যটা
+          চেপে দেখুন।
         </p>
       </Page>
     </div>

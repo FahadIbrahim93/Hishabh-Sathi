@@ -9,11 +9,7 @@ import {
 } from "@/lib/hishab/engine";
 import { formatTaka } from "@/lib/hishab/money";
 import { useHishab } from "@/lib/hishab/store";
-import {
-  Page,
-  ScreenHeader,
-  Secondary,
-} from "@/components/hishab/bits";
+import { Page, ScreenHeader, Secondary } from "@/components/hishab/bits";
 
 function moneyCard(title: string, value: string, note?: string) {
   return (
@@ -57,7 +53,11 @@ export function ReportsScreen() {
 
         <h2 className="font-display text-lg font-semibold text-ink mt-8">মাসের লাভ-ক্ষতি</h2>
         <div className="grid grid-cols-2 gap-3 mt-2">
-          {moneyCard("আয়", formatTaka(monthRevenue), `এই মাসের (${toBnGrouped(d.getDate())} তারিখ পর্যন্ত)`)}
+          {moneyCard(
+            "আয়",
+            formatTaka(monthRevenue),
+            `এই মাসের (${toBnGrouped(d.getDate())} তারিখ পর্যন্ত)`,
+          )}
           {moneyCard("খরচ", formatTaka(monthExpense), "খরচের হিসাব")}
           {moneyCard("লাভ", formatTaka(monthProfit), "আয় বাদ খরচ, বাদ বিক্রি হওয়া মালের দাম")}
         </div>
@@ -83,7 +83,11 @@ export function ReportsScreen() {
                     <td className="py-2 text-right text-ink">{formatTaka(row.receivable)}</td>
                     <td className="py-2 text-right text-ink">{row.days}</td>
                     <td className="py-2 text-ink">
-                      {row.bucket === "0-7" ? "এই সপ্তাহ" : row.bucket === "8-30" ? "৮-৩০ দিন" : "৩০+ দিন"}
+                      {row.bucket === "0-7"
+                        ? "এই সপ্তাহ"
+                        : row.bucket === "8-30"
+                          ? "৮-৩০ দিন"
+                          : "৩০+ দিন"}
                     </td>
                   </tr>
                 ))}
@@ -93,9 +97,7 @@ export function ReportsScreen() {
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3">
-          <Secondary onClick={back}>
-            ফিরে যান
-          </Secondary>
+          <Secondary onClick={back}>ফিরে যান</Secondary>
         </div>
       </Page>
     </div>

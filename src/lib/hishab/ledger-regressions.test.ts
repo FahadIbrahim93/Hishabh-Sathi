@@ -32,7 +32,15 @@ function shop(): Books {
       { id: "supplier", name: "Supplier", aliases: [], role: "supplier" },
     ],
     products: [
-      { id: "soap", name: "Soap", aliases: [], packName: "case", packSize: 1, pricePaisa: 10_000, costPaisa: 6_000 },
+      {
+        id: "soap",
+        name: "Soap",
+        aliases: [],
+        packName: "case",
+        packSize: 1,
+        pricePaisa: 10_000,
+        costPaisa: 6_000,
+      },
     ],
     entries: [
       {
@@ -53,12 +61,22 @@ function shop(): Books {
 }
 
 const sellTen = (books: Books, at = T0, receivedPaisa = 100_000) =>
-  buildSale(books, { id: `sale-${at}`, at, partyId: "rahim", productId: "soap", qty: 10, receivedPaisa });
+  buildSale(books, {
+    id: `sale-${at}`,
+    at,
+    partyId: "rahim",
+    productId: "soap",
+    qty: 10,
+    receivedPaisa,
+  });
 
 describe("reports follow the journal", () => {
   it("counts an expense in the month's expenses and profit", () => {
     let books = shop();
-    books = apply(books, buildExpense(books, { id: "rent", at: T0, amountPaisa: 50_000, label: "rent" }));
+    books = apply(
+      books,
+      buildExpense(books, { id: "rent", at: T0, amountPaisa: 50_000, label: "rent" }),
+    );
     assert.equal(expenseBetween(books, T0 - DAY, T0 + DAY), 50_000);
     assert.equal(profitBetween(books, T0 - DAY, T0 + DAY), -50_000);
   });
@@ -74,16 +92,32 @@ describe("reports follow the journal", () => {
   it("does not count a reversed collection as money collected", () => {
     let books = shop();
     books = apply(books, sellTen(books, T0 - 5 * DAY, 0));
-    const collection = buildCollection(books, { id: "col", at: T0, partyId: "rahim", amountPaisa: 60_000 });
+    const collection = buildCollection(books, {
+      id: "col",
+      at: T0,
+      partyId: "rahim",
+      amountPaisa: 60_000,
+    });
     books = apply(books, collection);
-    books = apply(books, buildReversal({ id: "undo", at: T0 + 1, original: collection, reason: "wrong shop" }));
+    books = apply(
+      books,
+      buildReversal({ id: "undo", at: T0 + 1, original: collection, reason: "wrong shop" }),
+    );
     assert.equal(collectedBetween(books, T0 - 1, T0 + DAY), 0);
   });
 
   it("ages a due from the oldest unpaid sale, not the latest payment", () => {
     let books = shop();
     books = apply(books, sellTen(books, T0, 0));
-    books = apply(books, buildCollection(books, { id: "one-taka", at: T0 + 89 * DAY, partyId: "rahim", amountPaisa: 100 }));
+    books = apply(
+      books,
+      buildCollection(books, {
+        id: "one-taka",
+        at: T0 + 89 * DAY,
+        partyId: "rahim",
+        amountPaisa: 100,
+      }),
+    );
     const [row] = duesAging(books, T0 + 90 * DAY);
     assert.equal(row?.days, 90);
     assert.equal(row?.bucket, "30+");
@@ -95,7 +129,10 @@ describe("reversals and returns cannot both undo one sale", () => {
     let books = shop();
     const sale = sellTen(books);
     books = apply(books, sale);
-    books = apply(books, buildReversal({ id: "undo", at: T0 + 1, original: sale, reason: "never happened" }));
+    books = apply(
+      books,
+      buildReversal({ id: "undo", at: T0 + 1, original: sale, reason: "never happened" }),
+    );
     assert.throws(() =>
       buildReturn(books, {
         id: "ret",
@@ -116,18 +153,39 @@ describe("reversals and returns cannot both undo one sale", () => {
     books = apply(books, sale);
     books = apply(
       books,
-      buildReturn(books, { id: "ret", at: T0 + 1, partyId: "rahim", productId: "soap", qty: 10, unitPricePaisa: 10_000, mode: "sold" }),
+      buildReturn(books, {
+        id: "ret",
+        at: T0 + 1,
+        partyId: "rahim",
+        productId: "soap",
+        qty: 10,
+        unitPricePaisa: 10_000,
+        mode: "sold",
+      }),
     );
-    assert.throws(() => apply(books, buildReversal({ id: "undo", at: T0 + 2, original: sale, reason: "x" })));
+    assert.throws(() =>
+      apply(books, buildReversal({ id: "undo", at: T0 + 2, original: sale, reason: "x" })),
+    );
     assert.equal(stockAt(books, "soap", WAREHOUSE), 100);
   });
 
   it("refuses a reversal that would leave negative cash", () => {
     let books = shop();
-    const sale = buildSale(books, { id: "cash-sale", at: T0, productId: "soap", qty: 10, receivedPaisa: 100_000 });
+    const sale = buildSale(books, {
+      id: "cash-sale",
+      at: T0,
+      productId: "soap",
+      qty: 10,
+      receivedPaisa: 100_000,
+    });
     books = apply(books, sale);
-    books = apply(books, buildExpense(books, { id: "spend", at: T0 + 1, amountPaisa: 1_100_000, label: "stock run" }));
-    assert.throws(() => apply(books, buildReversal({ id: "undo", at: T0 + 2, original: sale, reason: "x" })));
+    books = apply(
+      books,
+      buildExpense(books, { id: "spend", at: T0 + 1, amountPaisa: 1_100_000, label: "stock run" }),
+    );
+    assert.throws(() =>
+      apply(books, buildReversal({ id: "undo", at: T0 + 2, original: sale, reason: "x" })),
+    );
   });
 });
 
@@ -144,9 +202,21 @@ describe("cost and money precision", () => {
       paidPaisa: 0,
     });
     books = apply(books, purchase);
-    books = apply(books, buildReversal({ id: "undo", at: T0 + 1, original: purchase, reason: "wrong price" }));
+    books = apply(
+      books,
+      buildReversal({ id: "undo", at: T0 + 1, original: purchase, reason: "wrong price" }),
+    );
     assert.equal(books.products[0]?.costPaisa, 6_000);
-    books = apply(books, buildSale(books, { id: "all", at: T0 + 2, productId: "soap", qty: 100, receivedPaisa: 1_000_000 }));
+    books = apply(
+      books,
+      buildSale(books, {
+        id: "all",
+        at: T0 + 2,
+        productId: "soap",
+        qty: 100,
+        receivedPaisa: 1_000_000,
+      }),
+    );
     assert.equal(balance(books, "inventory"), 0);
     assert.equal(audit(books).ok, true);
   });

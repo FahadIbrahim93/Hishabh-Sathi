@@ -118,7 +118,8 @@ export function explain(books: Books, entry: Entry): Explained {
       add("কাকে", who);
       add("টাকা দিয়েছি", formatTaka(entry.meta.total ?? 0));
       if (entry.meta.label === "দেনা শোধ") add("দেনা কমেছে", formatTaka(entry.meta.total ?? 0));
-      if (entry.meta.label === "পাওনা বাড়বে") add("পাওনা বেড়েছে", formatTaka(entry.meta.total ?? 0));
+      if (entry.meta.label === "পাওনা বাড়বে")
+        add("পাওনা বেড়েছে", formatTaka(entry.meta.total ?? 0));
       return {
         title: "টাকা দিয়েছি",
         rows,
@@ -220,21 +221,24 @@ function line(account: Account, debit: number, credit: number, partyId?: string)
 }
 
 export function reversalFor(books: Books, originalId: string): Entry | undefined {
-  return books.entries.find(entry => entry.kind === "reversal" && entry.reversesEntryId === originalId);
+  return books.entries.find(
+    (entry) => entry.kind === "reversal" && entry.reversesEntryId === originalId,
+  );
 }
 
 export function apply(books: Books, entry: Entry): Books {
   if (books.entries.some((existing) => existing.id === entry.id)) return books;
   if (entry.kind === "reversal") {
-    const original = books.entries.find(row => row.id === entry.reversesEntryId);
+    const original = books.entries.find((row) => row.id === entry.reversesEntryId);
     if (!original || original.kind === "opening" || original.kind === "reversal") {
       throw new BooksError("এই হিসাব বিলোপ করা যায় না।");
     }
     if (reversalFor(books, original.id)) throw new BooksError("এই হিসাব আগেই বিলোপ করা হয়েছে।");
   }
-  const original = entry.kind === "reversal"
-    ? books.entries.find((row) => row.id === entry.reversesEntryId)
-    : undefined;
+  const original =
+    entry.kind === "reversal"
+      ? books.entries.find((row) => row.id === entry.reversesEntryId)
+      : undefined;
   if (
     original?.kind === "sale" &&
     original.partyId &&
@@ -371,9 +375,11 @@ export function buildOpening(input: {
   let inventory = 0;
   const stock: StockMove[] = [];
   for (const row of input.stock) {
-    if (!Number.isInteger(row.qty) || row.qty < 0) throw new BooksError("শুরুর মালের সংখ্যা ঠিক নয়।");
+    if (!Number.isInteger(row.qty) || row.qty < 0)
+      throw new BooksError("শুরুর মালের সংখ্যা ঠিক নয়।");
     inventory += row.qty * row.costPaisa;
-    if (row.qty > 0) stock.push({ productId: row.productId, location: WAREHOUSE, qtyDelta: row.qty });
+    if (row.qty > 0)
+      stock.push({ productId: row.productId, location: WAREHOUSE, qtyDelta: row.qty });
   }
   const names = input.stock
     .filter((row) => row.qty > 0)
@@ -418,10 +424,13 @@ export function buildSale(
     if (!Number.isInteger(qty) || qty <= 0) throw new BooksError("কয়টা মাল, সেটা বলুন।");
     if (!Number.isInteger(price) || price <= 0) throw new BooksError("প্রতি পিসের দাম বলুন।");
     const total = qty * price;
-    if (input.receivedPaisa > total) throw new BooksError("মোট বিক্রির চেয়ে বেশি টাকা পেয়েছেন। ঠিক করুন।");
+    if (input.receivedPaisa > total)
+      throw new BooksError("মোট বিক্রির চেয়ে বেশি টাকা পেয়েছেন। ঠিক করুন।");
     const due = total - input.receivedPaisa;
     const party = due > 0 ? mustParty(books, input.partyId) : partyById(books, input.partyId);
-    const location = input.fromConsignment ? partyLoc(mustParty(books, input.partyId).id) : WAREHOUSE;
+    const location = input.fromConsignment
+      ? partyLoc(mustParty(books, input.partyId).id)
+      : WAREHOUSE;
     const have = stockAt(books, product.id, location);
     if (have < qty) {
       const where = input.fromConsignment ? "দোকানে রাখা আছে" : "গুদামে আছে";
@@ -463,7 +472,8 @@ export function buildSale(
 
   const total = input.totalPaisa ?? 0;
   if (!Number.isInteger(total) || total <= 0) throw new BooksError("বিক্রির টাকা বলুন।");
-  if (input.receivedPaisa > total) throw new BooksError("মোট বিক্রির চেয়ে বেশি টাকা পেয়েছেন। ঠিক করুন।");
+  if (input.receivedPaisa > total)
+    throw new BooksError("মোট বিক্রির চেয়ে বেশি টাকা পেয়েছেন। ঠিক করুন।");
   const due = total - input.receivedPaisa;
   const party = due > 0 ? mustParty(books, input.partyId) : partyById(books, input.partyId);
   const lines: JournalLine[] = [];
@@ -547,7 +557,8 @@ export function buildConsign(
 ): Entry {
   const party = mustParty(books, input.partyId);
   const product = mustProduct(books, input.productId);
-  if (!Number.isInteger(input.qty) || input.qty <= 0) throw new BooksError("কয়টা মাল রাখবেন, সেটা বলুন।");
+  if (!Number.isInteger(input.qty) || input.qty <= 0)
+    throw new BooksError("কয়টা মাল রাখবেন, সেটা বলুন।");
   const have = stockAt(books, product.id, WAREHOUSE);
   if (have < input.qty) {
     throw new BooksError(
@@ -681,9 +692,12 @@ export function buildPurchase(
   },
 ): Entry {
   const product = mustProduct(books, input.productId);
-  if (!Number.isInteger(input.qty) || input.qty <= 0) throw new BooksError("কয়টা মাল এনেছেন, সেটা বলুন।");
-  if (!Number.isInteger(input.costPaisa) || input.costPaisa <= 0) throw new BooksError("কেনা দাম বলুন।");
-  if (!Number.isInteger(input.paidPaisa) || input.paidPaisa < 0) throw new BooksError("কত দিয়েছেন, সেটা বলুন।");
+  if (!Number.isInteger(input.qty) || input.qty <= 0)
+    throw new BooksError("কয়টা মাল এনেছেন, সেটা বলুন।");
+  if (!Number.isInteger(input.costPaisa) || input.costPaisa <= 0)
+    throw new BooksError("কেনা দাম বলুন।");
+  if (!Number.isInteger(input.paidPaisa) || input.paidPaisa < 0)
+    throw new BooksError("কত দিয়েছেন, সেটা বলুন।");
   const total = input.qty * input.costPaisa;
   if (input.paidPaisa > total) throw new BooksError("মোট কেনার চেয়ে বেশি দেওয়া হয়েছে।");
   const payable = total - input.paidPaisa;
@@ -692,7 +706,9 @@ export function buildPurchase(
   if (input.paidPaisa > 0) lines.push(line("cash", 0, input.paidPaisa));
   if (payable > 0 && party) lines.push(line("payable", 0, payable, party.id));
   const owned = stockTotal(books, product.id);
-  const avg = Math.round((owned * product.costPaisa + input.qty * input.costPaisa) / (owned + input.qty));
+  const avg = Math.round(
+    (owned * product.costPaisa + input.qty * input.costPaisa) / (owned + input.qty),
+  );
   return finish({
     id: input.id,
     kind: "purchase",
@@ -771,9 +787,10 @@ export function collectedBetween(books: Books, start: number, end: number): numb
   for (const entry of books.entries) {
     if (entry.at < start || entry.at >= end) continue;
     const sign = entry.kind === "reversal" ? -1 : 1;
-    const kind = entry.kind === "reversal"
-      ? books.entries.find((row) => row.id === entry.reversesEntryId)?.kind
-      : entry.kind;
+    const kind =
+      entry.kind === "reversal"
+        ? books.entries.find((row) => row.id === entry.reversesEntryId)?.kind
+        : entry.kind;
     if (kind === "sale" || kind === "collection") total += sign * (entry.meta.received ?? 0);
     if (kind === "return") total -= sign * (entry.meta.refund ?? 0);
   }
@@ -800,7 +817,11 @@ export function expenseBetween(books: Books, start: number, end: number): number
 }
 
 export function profitBetween(books: Books, start: number, end: number): number {
-  return revenueBetween(books, start, end) - cogsBetween(books, start, end) - expenseBetween(books, start, end);
+  return (
+    revenueBetween(books, start, end) -
+    cogsBetween(books, start, end) -
+    expenseBetween(books, start, end)
+  );
 }
 
 export type DueAging = {
