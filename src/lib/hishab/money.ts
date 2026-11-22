@@ -171,7 +171,7 @@ export function formatQty(qty: number, packSize = 1, packName = "কেস"): st
 }
 
 export function takaToPaisa(taka: number): number {
-  return Math.round(taka) * 100;
+  return Math.round(taka * 100);
 }
 
 /*
@@ -252,7 +252,11 @@ function phrases(): Phrase[] {
     list.push({ text: `${stem}ো`, value: h * 100 });
     list.push({ text: stem, value: h * 100 });
   }
-  list.push({ text: "লাখ", value: 100_000 }, { text: "হাজার", value: 1000 }, { text: "শত", value: 100 });
+  list.push(
+    { text: "লাখ", value: 100_000 },
+    { text: "হাজার", value: 1000 },
+    { text: "শত", value: 100 },
+  );
   list.sort((a, b) => b.text.length - a.text.length || b.value - a.value);
   phraseCache = list;
   return list;

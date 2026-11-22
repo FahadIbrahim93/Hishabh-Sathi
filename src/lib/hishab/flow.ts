@@ -14,7 +14,16 @@ import {
   stockAt,
 } from "./engine.ts";
 import { formatQty, formatTaka, takaToPaisa, takaWords } from "./money.ts";
-import { WAREHOUSE, partyLoc, type Books, type Draft, type Entry, type FlowKind, type FlowStep, type Mode } from "./types.ts";
+import {
+  WAREHOUSE,
+  partyLoc,
+  type Books,
+  type Draft,
+  type Entry,
+  type FlowKind,
+  type FlowStep,
+  type Mode,
+} from "./types.ts";
 
 export function blankDraft(kind: FlowKind, extra: Partial<Draft> = {}): Draft {
   return {
@@ -64,7 +73,8 @@ export function firstGap(draft: Draft, books: Books): FlowStep {
 
 function stepDone(step: FlowStep, draft: Draft, books: Books): boolean {
   if (step === "party") {
-    if (draft.kind === "purchase" || draft.kind === "payment") return Boolean(draft.partyId) || draft.partySkipped;
+    if (draft.kind === "purchase" || draft.kind === "payment")
+      return Boolean(draft.partyId) || draft.partySkipped;
     if (draft.kind === "expense") return true;
     if (draft.kind === "sale" && !draft.productId && books.mode === "khata") {
       const due = draft.receivedKnown ? draft.amountTaka - draft.receivedTaka : draft.amountTaka;
@@ -78,7 +88,8 @@ function stepDone(step: FlowStep, draft: Draft, books: Books): boolean {
     if (draft.kind === "expense") return draft.amountTaka > 0 && Boolean(draft.expenseLabel);
     if (draft.kind === "collection" || draft.kind === "payment") return draft.amountTaka > 0;
     if (draft.kind === "purchase") return draft.costTaka > 0 && draft.paidKnown;
-    if (draft.productId || books.mode === "stock") return draft.unitPriceTaka > 0 && draft.receivedKnown;
+    if (draft.productId || books.mode === "stock")
+      return draft.unitPriceTaka > 0 && draft.receivedKnown;
     return draft.amountTaka > 0 && draft.receivedKnown;
   }
   return true;
@@ -142,7 +153,9 @@ export function entryFromDraft(books: Books, draft: Draft, id: string, at = Date
       partyId: draft.partyId,
       productId: draft.productId,
       qty: piecesOf(draft, product?.packSize ?? 1),
-      unitPricePaisa: takaToPaisa(draft.unitPriceTaka || Math.round((product?.pricePaisa ?? 0) / 100)),
+      unitPricePaisa: draft.unitPriceTaka
+        ? takaToPaisa(draft.unitPriceTaka)
+        : (product?.pricePaisa ?? 0),
       mode: draft.returnMode,
       reason: draft.expenseLabel || undefined,
     });
@@ -177,15 +190,28 @@ export interface Preview {
   after: { k: string; v: string }[];
 }
 
-export function previewDraft(books: Books, draft: Draft, at = Date.now()): Preview | { ok: false; error: string } {
+export function previewDraft(
+  books: Books,
+  draft: Draft,
+  at = Date.now(),
+): Preview | { ok: false; error: string } {
   try {
     const entry = entryFromDraft(books, draft, "preview-temp", at);
     const next = apply(structuredClone(books), entry);
     const view = explain(books, entry);
     const after: { k: string; v: string }[] = [];
-    if (entry.partyId && (entry.kind === "sale" || entry.kind === "collection" || entry.kind === "return" || entry.kind === "payment")) {
+    if (
+      entry.partyId &&
+      (entry.kind === "sale" ||
+        entry.kind === "collection" ||
+        entry.kind === "return" ||
+        entry.kind === "payment")
+    ) {
       if (entry.kind !== "payment" || entry.meta.label === "পাওনা বাড়বে") {
-        after.push({ k: "এই দোকানের পাওনা হবে", v: formatTaka(balance(next, "receivable", entry.partyId)) });
+        after.push({
+          k: "এই দোকানের পাওনা হবে",
+          v: formatTaka(balance(next, "receivable", entry.partyId)),
+        });
       }
       if (entry.kind === "payment" && entry.meta.label === "দেনা শোধ") {
         after.push({ k: "এখন দেনা", v: formatTaka(balance(next, "payable", entry.partyId)) });
@@ -202,11 +228,17 @@ export function previewDraft(books: Books, draft: Draft, at = Date.now()): Previ
           v: formatQty(stockAt(next, product.id, WAREHOUSE), product.packSize, product.packName),
         });
         if (entry.partyId) {
-          const held = productsAt(next, partyLoc(entry.partyId)).filter((row) => row.product.id === product.id);
+          const held = productsAt(next, partyLoc(entry.partyId)).filter(
+            (row) => row.product.id === product.id,
+          );
           if (held.length || entry.kind === "consign") {
             after.push({
               k: "দোকানে রাখা মাল",
-              v: formatQty(stockAt(next, product.id, partyLoc(entry.partyId)), product.packSize, product.packName),
+              v: formatQty(
+                stockAt(next, product.id, partyLoc(entry.partyId)),
+                product.packSize,
+                product.packName,
+              ),
             });
           }
         }
@@ -218,7 +250,12 @@ export function previewDraft(books: Books, draft: Draft, at = Date.now()): Previ
       rows: view.rows,
       foot: view.foot,
       readback: readback(draft, books),
-      banner: bannerFor(entry.kind, Boolean(entry.meta.fromConsignment), entry.meta.returnMode, entry.meta.label),
+      banner: bannerFor(
+        entry.kind,
+        Boolean(entry.meta.fromConsignment),
+        entry.meta.returnMode,
+        entry.meta.label,
+      ),
       after,
     };
   } catch (error) {
@@ -298,5 +335,4 @@ export function readback(draft: Draft, books: Books): string {
   return `${takaWords(draft.amountTaka)} টাকা ${draft.expenseLabel || "খরচ"}।`;
 }
 
-export const READBACK_LIGHTER =
-  "এক হাজার টাকার বিক্রি, ছয়শ টাকা পেয়েছেন, চারশ টাকা বাকি।";
+export const READBACK_LIGHTER = "এক হাজার টাকার বিক্রি, ছয়শ টাকা পেয়েছেন, চারশ টাকা বাকি।";
