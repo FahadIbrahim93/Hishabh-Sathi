@@ -227,7 +227,7 @@ export function formatWhen(ts: number, now = Date.now()): string {
 }
 
 /*
- * ড়, ঢ় and য় each have two encodings: one precomposed code point, or the base
+ * ড়, ঢ় and য় each have two encodings: one precomposed code point, or the base
  * letter plus the nukta sign U+09BC. Unicode NFC always produces the second
  * (the precomposed letters are composition exclusions), so text from a speech
  * engine or a normalising keyboard arrives decomposed while every word this
@@ -235,9 +235,9 @@ export function formatWhen(ts: number, now = Date.now()): string {
  */
 function foldNukta(input: string): string {
   return input
-    .replace(/\u09A1\u09BC/g, "\u09DC") // ড + nukta -> ড়
-    .replace(/\u09A2\u09BC/g, "\u09DD") // ঢ + nukta -> ঢ়
-    .replace(/\u09AF\u09BC/g, "\u09DF"); // য + nukta -> য়
+    .replace(/\u09A1\u09BC/g, "\u09DC") // ড + nukta -> ড়
+    .replace(/\u09A2\u09BC/g, "\u09DD") // ঢ + nukta -> ঢ়
+    .replace(/\u09AF\u09BC/g, "\u09DF"); // য + nukta -> য়
 }
 
 export function normalizeText(input: string): string {
@@ -250,8 +250,8 @@ export function normalizeText(input: string): string {
 
 /*
  * `unit` is the place value the phrase counts in: 1 for "তিন", 100 for
- * "তিনশ", 1000 for "তিন হাজার". "সাড়ে" adds half of it. A bare "হাজার" has
- * no count, so it has no unit and "সাড়ে হাজার" is not read as a number.
+ * "তিনশ", 1000 for "তিন হাজার". "সাড়ে" adds half of it. A bare "হাজার" has
+ * no count, so it has no unit and "সাড়ে হাজার" is not read as a number.
  */
 type Phrase = { text: string; value: number; unit?: number };
 
@@ -281,20 +281,27 @@ function phrases(): Phrase[] {
   return list;
 }
 
-/* Spoken multipliers that follow a count after a space: "৩ হাজার", "দেড় লাখ". */
+/*
+ * Multipliers that follow a count after a space: "৩ হাজার", "দেড় লাখ", and
+ * "দেড় শো" or "৫ শো" when a speech engine splits the hundred off.
+ */
 const SPACED_UNITS: [string, number][] = [
   ["লাখ", 100_000],
   ["হাজার", 1000],
+  ["শো", 100],
+  ["শ", 100],
 ];
-/* The hundred suffix joins its count: "দেড়শ", "আড়াইশো". Longest first. */
+/* The hundred suffix joins its count: "দেড়শ", "আড়াইশো". Longest first. */
 const HUNDRED_SUFFIXES = ["শো", "শ"];
 /* One and a half, two and a half: they multiply the unit that follows. */
 const HALF_WORDS: [string, number][] = [
-  ["\u09A6\u09C7\u09DC", 1.5], // দেড়
-  ["\u0986\u09DC\u09BE\u0987", 2.5], // আড়াই
+  ["\u09A6\u09C7\u09DC", 1.5], // দেড়
+  ["\u0986\u09DC\u09BE\u0987", 2.5], // আড়াই
 ];
-/* "সাড়ে" adds a half to the count after it: সাড়ে তিন হাজার is 3,500. */
-const SARE = "\u09B8\u09BE\u09DC\u09C7"; // সাড়ে
+/* "সাড়ে" adds a half to the count after it: সাড়ে তিন হাজার is 3,500. */
+const SARE = "\u09B8\u09BE\u09DC\u09C7"; // সাড়ে
+/* টা, টায়, টার, টাতে as a whole word, after the text has been through foldNukta. */
+const CLOCK_SUFFIX = /^\s*\u099F\u09BE(?:\u09DF|\u09B0|\u09A4\u09C7)?(?![\u0980-\u09FF])/;
 
 type Match = { value: number; unit?: number; end: number };
 
@@ -336,7 +343,7 @@ function countAt(text: string, i: number): Match | null {
   return null;
 }
 
-/* "দেড়", "দেড়শ", "দেড় হাজার", and the same for আড়াই. */
+/* "দেড়", "দেড়শ", "দেড় হাজার", and the same for আড়াই. */
 function halfWordAt(text: string, i: number): Match | null {
   if (isBengali(text[i - 1])) return null;
   for (const [word, factor] of HALF_WORDS) {
@@ -356,14 +363,17 @@ function halfWordAt(text: string, i: number): Match | null {
   return null;
 }
 
-/* "সাড়ে" + a count: half of the count's unit on top of it. */
+/* "সাড়ে" + a count: half of the count's unit on top of it. */
 function sareAt(text: string, i: number): Match | null {
   if (isBengali(text[i - 1]) || !text.startsWith(SARE, i)) return null;
   const after = i + SARE.length;
   const space = /^\s+/.exec(text.slice(after));
   if (!space) return null;
   const count = countAt(text, after + space[0].length);
-  if (!count?.unit) return null;
+  if (!count?.unit || !wordEndsAt(text, count.end)) return null;
+  // "সাড়ে ৩টায়", "সাড়ে ৩ টায়": half past three is a time, not an amount. Only
+  // the clock suffixes টা/টায়/টার/টাতে count; "সাড়ে তিন টাকা" is money.
+  if (count.unit === 1 && CLOCK_SUFFIX.test(text.slice(count.end))) return null;
   return { value: count.value + count.unit / 2, end: count.end };
 }
 
@@ -381,7 +391,7 @@ export interface AmountHit {
 
 /*
  * Find the amounts in `text`, which must already be through normalizeText
- * (ASCII digits, precomposed ড়/য়). A value can be fractional — "সাড়ে তিন"
+ * (ASCII digits, precomposed ড়/য়). A value can be fractional — "সাড়ে তিন"
  * is 3.5 — and callers decide whether a fraction is acceptable where they
  * use it; this function never rounds.
  */

@@ -36,6 +36,8 @@ const SPOKEN: [string, number][] = [
   ["সা{r}ে বারো হাজার", 12_500],
   ["সা{r}ে ৩ হাজার", 3_500],
   ["সা{r}ে ৩শ", 350],
+  ["দে{r} শো", 150],
+  ["আ{r}াই শ", 250],
   ["দুই হাজার দে{r}শ", 2_150],
   ["এক লাখ আ{r}াই হাজার", 102_500],
 ];
@@ -117,7 +119,7 @@ describe("voice drafts carry fraction amounts exactly", () => {
       );
       expect(parsed.kind).toBeNull();
       expect(parsed.unitPriceTaka).toBeUndefined();
-      expect(parsed.notes.join(" ")).toMatch(/পুরো সংখ্যায়/);
+      expect(normalizeText(parsed.notes.join(" "))).toContain(normalizeText("পুরো সংখ্যায়"));
     });
   }
 
@@ -140,6 +142,69 @@ describe("voice drafts carry fraction amounts exactly", () => {
       );
       expect(parsed.kind).toBe("collection");
       expect(parsed.receivedTaka).toBe(600);
+    });
+  }
+
+  for (const [label, rr] of SPELLINGS) {
+    it.each(
+      (
+        [
+          ["পাঁচ লাখ আ{r}াই হাজার", 502_500],
+          ["বারো লাখ দে{r} হাজার", 1_201_500],
+          ["এক লাখ সা{r}ে তিন হাজার", 103_500],
+        ] as const
+      ).map(([amount, taka]) => [spell(amount, rr), taka] as const),
+    )(`reads a long amount after the verb whole: %s (${label})`, (amount, taka) => {
+      const parsed = parseUtterance(`করিমের কাছ থেকে পেয়েছি ${spell(amount, rr)} টাকা`, books);
+      expect(parsed.kind).toBe("collection");
+      expect(parsed.receivedTaka).toBe(taka);
+    });
+
+    it(`reads a long price after প্রতি whole (${label})`, () => {
+      const parsed = parseUtterance(
+        spell(
+          "রহিম স্টোরে এক কেস লাইটার বিক্রি করেছি। প্রতি কেস দাম হিসাবে ধরলাম তেরো হাজার দে{r}শো টাকা।",
+          rr,
+        ),
+        books,
+      );
+      expect(parsed.unitPriceTaka).toBe(13_150);
+    });
+
+    it(`does not read a fraction in a product or shop name as an amount (${label})`, () => {
+      const named: typeof books = {
+        ...books,
+        parties: [
+          ...books.parties,
+          { id: "arai", name: spell("আ{r}াই হাজারী স্টোর", rr), aliases: [], role: "customer" },
+        ],
+        products: [
+          ...books.products,
+          { ...books.products[0]!, id: "coke", name: spell("দে{r} লিটার কোক", rr), aliases: [] },
+        ],
+      };
+      const sale = parseUtterance(
+        spell("রহিম স্টোরে দুই কেস দে{r} লিটার কোক বিক্রি করেছি", rr),
+        named,
+      );
+      expect(sale.kind).toBe("sale");
+      expect(sale.productId).toBe("coke");
+      expect(sale.qtyInput).toBe(2);
+      const paid = parseUtterance(spell("আ{r}াই হাজারী স্টোর থেকে পাঁচশ টাকা পেয়েছি", rr), named);
+      expect(paid.kind).toBe("collection");
+      expect(paid.partyId).toBe("arai");
+      expect(paid.receivedTaka).toBe(500);
+    });
+
+    it(`does not read সাড়ে before a clock time as a fraction (${label})`, () => {
+      for (const when of ["সা{r}ে ৩টায়", "সা{r}ে ৩ টায়"]) {
+        const parsed = parseUtterance(
+          `${spell(when, rr)} করিমের কাছ থেকে পাঁচশ টাকা পেয়েছি`,
+          books,
+        );
+        expect(parsed.kind).toBe("collection");
+        expect(parsed.receivedTaka).toBe(500);
+      }
     });
   }
 
