@@ -1,58 +1,77 @@
 # Hishab Sathi — হিসাব সাথী
 
-Bangla-first, offline-first bookkeeping and stock for Bangladeshi distributors, wholesalers and small retail shops.
+**VoiceBooks AI's active implementation by Hope Theory Labs.** A Bangla-first bookkeeping assistant for Bangladeshi small businesses, starting with distributors, wholesalers and local shops.
 
-> আপনার দোকানের হিসাব, হিসাবের ভাষায়। কখনও হারাবে না, কখনও মিলবে না এমন হবে না।
+**Product goal:** An owner should be able to record a purchase, sale, consignment delivery, collection or expense in familiar Bangla without needing to understand accounting. Confirmed transactions should generate trustworthy stock, dues and double-entry books. **Voice-first entry is the product direction, not a field-verified production capability.**
 
-## What it is
+> Current release status (21 November 2026): **pre-production, not deployed and not ready for real merchant books.** Follow [status](docs/STATUS.md), [roadmap](docs/ROADMAP.md) and [open issues](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues).
 
-The owner speaks or taps a transaction in plain Bangla, the app reads it back, and nothing changes until they confirm. Under the hood is a correct double-entry ledger, so the numbers can be trusted by the owner, their accountant, their bank and the tax office.
+## What is implemented
 
-The differentiator:
+- Bangla-first transaction and catalog UI; onboarding without automatically inserting a fictional business.
+- Append-only double-entry journal with money in integer paisa, stock movements, credit sales, collections and consignment workflows. **Some financial edge cases remain open**; see #35–#39 and #41.
+- Local IndexedDB persistence with legacy localStorage migration.
+- Reversal/correction entries; guards against duplicate corrections and unsafe writes.
+- JSON backup/restore with validation and durable-device-write confirmation.
+- Customer and product management, daily and monthly reports, and dues aging (aging edge cases are **not yet resolved**).
+- Typecheck, lint, test, production build, hosted dependency/security checks and PostgreSQL auth-schema integration tests.
 
-- **Consignment done right** — goods left at a shop are not a sale and not a receivable until they sell.
-- **Dues (বাকি) tracking** — who owes how much, and since when, per shop.
-- **Immutable history** — entries are never edited or deleted; mistakes are fixed with a reversing entry.
-- **Offline first** — works with no network; sync is the backup and the bridge between devices, never a dependency.
-- **Never lose data** — backup before features.
+### Important limits
 
-## Tech stack (baseline)
+- **Not hosted.** There is no verified live app or production database.
+- **Not an installable offline PWA yet.** Books are saved locally, but app-shell offline reopening, service worker and installability remain in [#17](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/17).
+- **No cross-device sync or merchant OTP.** A PostgreSQL auth test is not a production login or sync service. See [#21](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/21).
+- **Bangla speech is experimental/unbenchmarked.** Never assume an ambiguous voice command has entered the ledger; explicit review and confirmation are part of the target design. See [voice acceptance issue](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/44).
+- **Tax/VAT compliance is not verified.** Reporting is not tax advice or an approved statutory filing workflow.
+- **Local data can still be lost** if device/browser storage is cleared or lost and no usable backup exists. Do not use for real merchant records before recovery/device QA.
 
-- Client: React app on TanStack Start + TanStack Router, IndexedDB local store. The PWA manifest and service worker are not built yet.
-- Server: TypeScript on Node, Postgres (Kysely), phone + OTP auth (Better Auth)
-- Ledger: append-only events, idempotent `apply`; all money in integer paisa (BDT)
+## Engineering checkpoint — 21 November 2026
 
-See `docs/adr/` for the architecture decisions (D-01 to D-04).
+Current inspected main: `da0b35d`. Hosted [CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834750585) and [dependency/auth verification](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834750266) succeeded at that commit. The last recorded local upgrade verification in `SESSION.md` was 110/110 tests and zero npm audit advisories. These are engineering checks **not** launch or field quality certification.
 
-## Repo status
+- Merged safety work: receipt durability (#24), startup recovery (#26), validated restore (#29), duplicate reversal protection (#31), catalog durability (#33), dependency/auth audit (#34) and CI hardening (#40).
+- [PR #42](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/42) adds property/merchant-facing checks and has passing hosted checks, but is **open** at this checkpoint.
+- Priorities: finalize property baseline (#18), resolve financial defects (#39, #35, #36, #37, #41, #38), perform genuine offline/device QA (#17, #43), validate Bangla voice (#44), and execute a controlled merchant pilot (#45). Hosting/sync requires founder decisions (#19, #21) and release sign-off (#46).
+- Four older Dependabot PRs need re-triage (#16). Do not merge stale red dependency changes.
 
-Pre-production, nothing deployed. Phases 0 and 1 are merged (ledger engine, on-device storage, reversals, backup and restore, catalog editing, reports). Next: security fixes, offline install, then server sync. See [docs/STATUS.md](docs/STATUS.md) and [docs/ROADMAP.md](docs/ROADMAP.md). Decisions are in `docs/adr/`; coding agents start with [AGENTS.md](AGENTS.md).
+See [full current status](docs/STATUS.md) and [sequenced implementation roadmap](docs/ROADMAP.md). For financial/data changes, **failing regression first, then fix, then verified CI/main and documented rollback**.
 
-This is the same product as the private `voicebooks-ai` repo (its earlier name and Python MVP).
+## Architecture (current code versus planned services)
+
+- **Client:** React / TanStack Start / TanStack Router; IndexedDB using `idb`; Bangla-first screens.
+- **Ledger:** append-only event model, idempotent application, integer paisa, consignment explicitly separate from completed sales.
+- **Server (planned):** TypeScript, Kysely + PostgreSQL event sync, per-merchant isolation, Better Auth phone OTP. The auth schema has integration checks; production sync and OTP are not implemented.
+- **Voice (unvalidated):** browser speech recognition exploration; real-world transcription, dialect handling, confirmation, device coverage and cost must be benchmarked before claims.
+
+Decisions: [ADRs](docs/adr/). Agent operating rules: [AGENTS.md](AGENTS.md). Critical business decisions: [#19](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/19).
 
 ## Run locally
 
-Requires Node.js 22+ and npm.
+Requires Node.js 22+ and npm:
 
 ```bash
 npm ci
-npm run db:migrate      # skipped unless DATABASE_URL is set; PGLite fallback applies migrations locally
-npm run dev             # http://0.0.0.0:8080
+npm run db:migrate  # skips remote DB work if DATABASE_URL is unset
+npm run dev         # http://localhost:8080
 ```
 
-## Test
+Use **synthetic test data only** until device recovery and merchant-consent gates have passed.
+
+## Verify locally
 
 ```bash
-npm test           # vitest run — includes the ledger engine tests
-npm run typecheck  # tsc --noEmit
-npm run lint       # eslint .
-npm run build      # Vite build + migrations
+npm run typecheck
+npm run lint
+npm test
+npm run test:ci
+npm run build
+npm run audit
 ```
 
-## License
+Some browser tests need correctly provisioned Chromium and Bangla fonts; do not mistake a skipped browser spec for a passed check. Refer to the hosted CI gate for validated provisioning.
 
-No licence selected yet (decision D-03 is open). Until one is chosen, all rights reserved — do not copy or redistribute.
+## Project identity and license
 
-## Contributing
+`FahadIbrahim93/Hishabh-Sathi` is the **active implementation**. The private `voicebooks-ai` repository contains the earlier Python/SQLite MVP and reference research; its Next.js/Supabase/STT blueprint must not silently override the accepted codebase/ADRs.
 
-See `CONTRIBUTING.md`.
+No open-source license has been approved (D-03 remains proposed). **All rights reserved** until the owner decides. See [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -1,44 +1,48 @@
-# Status — 18 November 2026
+# Project status — 21 November 2026
 
-Snapshot of `main` at `e5169d3` (last commit 10 Nov 2026). Written from the code, git history, CI runs and a local `npm audit`.
+**Repository:** `FahadIbrahim93/Hishabh-Sathi` (active product build). `voicebooks-ai` is earlier reference/prototype only.
 
-## What is live
+**Readiness verdict:** **pre-production**. There is no verified live deployment, merchant adoption, field voice benchmark, production server ledger/sync, or real-phone QA sign-off. Passing code checks do **not** imply those milestones.
 
-**Nothing is deployed.** There is no hosting, no homepage link and no live URL. The app runs locally with `npm run dev`. Everything is stored on the device in IndexedDB; there is no server sync, and sign-in for real shops is not wired up.
+## Verified code/CI baseline
 
-## What works today (Phases 0 and 1, merged 9 to 10 Nov 2026)
+- Inspected main SHA: [`da0b35d`](https://github.com/FahadIbrahim93/Hishabh-Sathi/commit/da0b35dad9bdab2efbd61778ac96ae3ae21e6c1a).
+- [Hosted CI on main](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834750585): **success**.
+- [Hosted dependency and PostgreSQL auth verification on main](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834750266): **success**.
+- `SESSION.md` records 110/110 tests in 13 files and zero npm audit findings after the dependency remediation; the post-merge main workflows above also succeeded. Avoid claiming that all possible transaction paths or phone devices were tested.
+- [PR #42](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/42), adding ledger property and merchant-facing checks, is **open** with passing hosted checks at `47ffcd32`; it is not yet merged. Tracked in [#18](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/18).
 
-- Double-entry ledger engine in integer paisa, with consignment, dues and reversing entries.
-- First launch with a real, empty shop instead of seeded demo data ([#8](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/8)).
-- Local persistence in IndexedDB with migration from the old `localStorage` data ([#7](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/7)).
-- Void or correct any entry with a reversing entry ([#9](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/9)).
-- One-tap JSON backup and restore ([#10](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/10)).
-- Bangla digits parse correctly; `audit()` never throws on a malformed entry ([#11](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/11), [#12](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/12)).
-- Edit and archive parties and products, phone number on a party ([#13](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/13)).
-- Reports v1: daily close, month profit and loss, dues aging ([#14](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/14)).
+## Implemented, with evidence boundaries
 
-## Checks
+| Area | What is currently evidenced | Remaining limitations |
+| --- | --- | --- |
+| Ledger and local UI | Double-entry events, purchases, sales, consignment, collections, reversals, catalog and reports (Phase 1, #7–#14) | Financial edge cases #35–#39 and #41 remain open |
+| Device durability | Receipts (#24), startup reads (#26), manual restore (#29), one reversal per original (#31), catalog/first run (#33) protected by tests and merges | Real Android QA, long-term data survival and recovery drill not signed off (#43) |
+| Dependency and CI | Security upgrades (#34), lockfile/audit/Chrome/Bangla-font CI gate (#40) merged | Historical Dependabot branches now require re-triage (#16); monitor future advisories |
+| Offline operation | IndexedDB on-device book storage | No installable offline shell/service worker (#17); clearing browser data can lose unsynced books |
+| Server auth | PostgreSQL 16 schema and auth flow exercised in hosted integration test (#34) | No deployed login/merchant OTP, tenant-ledger service or cross-device sync (#21) |
+| Voice | Browser recognition exploration exists | No proven transcription or correct money-field benchmark (#44) |
+| Market/compliance | Distributor use case and reference research | No recorded 10 interviews, five-shop pilot, or tax/VAT sign-off (#19, #45, #46) |
 
-On 18 Nov 2026 `npm run typecheck`, `lint`, `test` (75 tests in 7 files) and `build` all pass. CI (`ci`) is required on `main`.
+## Confirmed open blockers, in dependency order
 
-## Open pull requests
+1. **Verify property baseline:** #18 / PR #42. Close only after merge and fresh main CI.
+2. **Financial correctness and explicit accounting policy:** #39 fractional taka; #35 drawer funding/negative cash; #36 customer credits after reversed sales; #37 weighted cost after purchase reversal; #41 returnable stock after reversal; #38 aging allocation/archived dues. These are separate observed defects, **not fixed by** #42.
+3. **Offline and device safety:** #17, #43. Do not mistake local data persistence for a genuine offline install or disaster-recovery guarantee.
+4. **Product validation:** #44 voice benchmark, #45 one distributor + five shops, with synthetic data and consent rules.
+5. **Founder decisions and later platform:** #19 (architecture confirmation, license, hosting, interviews, SSOT and policy), #21 (blocked Phase 2 server sync/OTP), #46 release readiness.
+6. **Dependency maintenance:** #16. Four old open Dependabot PRs (#2, #3, #5, #6); #4 was closed without merge after the direct security upgrade superseded it. Old green checks are stale.
 
-Five Dependabot PRs, open since 9 Nov: [#2](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/2) (react-accordion), [#3](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/3) (tailwindcss), [#4](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/4) (typescript-eslint) and [#6](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/6) (eslint-plugin-prettier) are green. [#5](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/5) (`@eslint/js` 10) fails install because the repo is on ESLint 9. Tracked in [#16](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/16).
+## Evidence still missing
 
-## Security
+- No real-phone/browser test matrix with committed-book parity and recovery demonstration.
+- No actual SMS, cross-device synchronization, per-business production authorization or production hosting evidence.
+- No accepted accuracy threshold for Bangla speech-to-financial-fields, dialect/noise performance, or explicit voice confirmation workflow.
+- No documented ten shop-owner interviews and no successful distributor-plus-five-shops reconciliation pilot.
+- No production privacy/security, data protection, VAT interpretation or launch approval.
 
-`npm audit --omit=dev` reports 20 vulnerabilities (3 critical, 13 high, 2 moderate, 2 low), including `better-auth` advisories and dev-only `vitest` ones. GitHub shows no alerts because Dependabot alerts are off. Tracked in [#15](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/15).
+## Next operational step
 
-## Known gaps
+Review PR #42 without broadening it into financial behavior changes, verify current main after merge, and then address the accounting defects one issue at a time with founder decisions where required. Record each failing reproduction, acceptance tests, results, rollback and merged-main verification in `SESSION.md`.
 
-- Not an installable PWA yet: no manifest, no service worker ([#17](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/17)).
-- No server-side ledger tables or sync; only an auth migration exists ([#21](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/21)).
-- Ledger has only example-based tests; property tests are required by CONTRIBUTING ([#18](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/18)).
-- Phase 0 exit gate (10 shop-owner interviews logged) is not met; the README still said "Phase 0 in progress".
-- The "SSOT" document cited in the ADRs and code is not in the repo.
-- ADR D-03 (licence) is still proposed. All rights reserved meanwhile.
-- CI uses `npm install` and `vercel.json` has an install command that probably breaks a real build ([#20](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/20)).
-
-## Relationship to voicebooks-ai
-
-Same product, earlier name. The private `voicebooks-ai` repo holds the legacy Python/SQLite MVP, a fictional browser demo and the first V2 blueprint (Next.js, Supabase, Cloud STT). This repo took a different stack. Which path is canonical is Fahad's call ([#19](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/19)).
+**For the full execution sequence, use [ROADMAP.md](ROADMAP.md).** This document supersedes the outdated 18 November status snapshot.

@@ -6,9 +6,55 @@ Seven regression cases failed before the fix. All 202 tests passed afterwards, i
 
 Review this follow-up with #51 and verify the combined head before merging to main. #60 passed hosted CI for the separate reset fix.
 
+# Ledger verification · 21 November 2026
+
+#20 passed the [post-merge CI gate](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834750585). Issue #18 adds generated ledger, dues, consignment, rounding and Bangla parser checks. Historical money and reporting defects are tracked in #35–#39 and #41. Use actual hosted results for release decisions.
+
+# Ledger property tests checkpoint - 20 November 2026
+
+Issue #18. Branch `feat/ledger-property-tests`, stacked on `fix/ci-gate` (`9ed0c49`) so the new dev dependency sits under the audit gate recorded below.
+
+## What changed
+
+- `fast-check` 4.10.3 as a dev dependency. It has no transitive dependencies, so the audited tree stays at zero advisories.
+- `src/lib/hishab/ledger.property.test.ts`, five properties:
+  1. **Random walk.** A generated catalog (cost, price, pack size, opening cash and stock) plus a generated script of up to 14 operations. After *every* accepted posting: lines are integer paisa with one side per line and debits equal credits; every account and party balance moved by exactly its lines; stock moved by exactly the entry's moves and no product/location went negative; the trial balance holds in the app's normal-sign terms; history is append-only with unique ids; `audit()` is ok; replaying the entry is a no-op.
+  2. **Reversal exactness.** Correcting an entry returns every account, party and product/location balance to the values immediately before that entry, and the original stays on the record.
+  3. **Mirror and single correction.** The reversal swaps every debit and credit, negates every stock move, links the original, and refuses a second correction.
+  4. **Refusal atomicity.** Fourteen invalid operations (over-sell, zero price, over-collection, payment above cash, over-consign, over-return, over-paid purchase, zero amounts, reversal of the opening balance, unknown mirror target) throw and leave the books unchanged.
+  5. **Coverage guard.** A fixed script must exercise all eight operation kinds and both return modes, so a generator change cannot quietly stop testing a path.
+- Requests that the engine re-validates and refuses in `apply` (stock gone, already corrected) count as atomic rejections, not failures: generators build feasible operations and the ledger keeps the final say.
+
+## Findings (documented, not encoded — behaviour changes need Fahad)
+
+1. `buildExpense` never checks available cash, while `buildPayment` refuses to spend more than the drawer holds. An expense can drive `cash` below zero.
+2. A sold return refunds `value - min(due, value)` without checking cash, so a refund can take the drawer below zero when the customer had no due.
+3. `apply` re-validates stock on a reversal but not cash or receivable. Reversing a sale whose due was already collected leaves that customer in credit (negative receivable). That may be a real customer credit, but the collection path refuses to produce the same state, so the two paths disagree.
+4. `buildReversal` mirrors lines and stock but not `costUpdate`/`priceUpdate`, so reversing a purchase leaves the weighted-average cost at the post-purchase value.
+
+The generators stay off paths 1 and 2, so the suite asserts guarantees instead of recording defects; nothing here locks the current behaviour in.
+
+## Verification
+
+- `npm run test:ci`: **122/122 tests in 15 files, 0 skipped, 3 browser specs executing**, gate line `test gate: ok - 122 passed, 0 failed, 0 skipped, 3 browser specs across 15 files (floor 110)`.
+- `npm ci` from the updated lockfile 0 - `typecheck` 0 - `lint` 0 with the same 3 pre-existing warnings - `build` 0 - `npm run audit` 0.
+
+## Still outstanding
+
+- Issue #18's acceptance criteria could not be read: `gh` is unauthenticated and the unauthenticated GitHub API was rate-limited. Scope comes from `CONTRIBUTING.md` ("ledger changes require property tests") and the roadmap entry.
+- The properties cover the engine. The device store and the UI keep their existing example-based and browser coverage.
+
 # Hosted CI gate · 21 November 2026
 
 #15 merged via #34. Main passed [dependency and PostgreSQL verification](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834416515) and [CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834416531) on 55feee0. Issue #20 now enforces the lockfile, dependency audit and all four browser scenarios. The audit script lives in the same change as its workflow invocation.
+
+# Demo reset protection · 27 November 2026
+
+Issue #49, reset scope. An existing shop must select a readable, valid backup matching the current books before replacing them with demo data. The existing IndexedDB transaction rejects a stale tab. A new device can still start with demo data from onboarding.
+
+Local checks passed on the fix based on `da0b35d`. The strict suite ran 122 tests including five Chromium specs with zero skips. The reset spec downloaded a backup, tested cancellation and an aborted write, retried after reload and restored the exact original books. Typecheck, lint and build passed. Lint reported three existing warnings.
+
+The #42 ledger test branch also passed locally, with 128 tests. Its application and test changes combined with this fix passed 132 tests, including five Chromium specs. Settle #35 before combining the financial behavior changes in #48. The remaining reporting defects stay tracked in #49.
 
 # Dependency verification · 21 November 2026
 

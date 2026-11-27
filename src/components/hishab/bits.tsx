@@ -44,14 +44,17 @@ export function Primary({
 export function Secondary({
   children,
   onClick,
+  disabled,
 }: {
   children: ReactNode;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-card px-4 font-display text-base font-semibold text-ink ring-1 ring-line"
     >
       {children}
