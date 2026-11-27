@@ -83,13 +83,35 @@ export function parseUtterance(input: string, books: Books): ParseResult {
 
   const party = findParty(
     text,
-    books.parties.filter((item) => item.role === "customer" || kind === "purchase" || kind === "payment"),
+    books.parties.filter(
+      (item) => item.role === "customer" || kind === "purchase" || kind === "payment",
+    ),
   );
   const product = findProduct(text, books.products);
-  const qty = findQty(text);
-  const price = findPrice(text);
-  const received = findReceived(text);
-  const paid = findPaid(text);
+  const supplier = kind === "purchase" ? findParty(text, books.parties) : undefined;
+  // A name is not an amount: "দেড় লিটার কোক" is a product and "আড়াই হাজারী
+  // স্টোর" a shop. Numbers are read from the sentence with those names blanked.
+  const numbers = blankNames(text, [party, product, supplier]);
+  // Keep explicit decimal amounts out of drafts until the posting policy is defined.
+  if (/\d\.\d/.test(numbers)) {
+    return {
+      kind: null,
+      notes: ["দশমিক সংখ্যা পাওয়া গেছে। সঠিক পরিমাণ ফর্মে লিখুন।"],
+    };
+  }
+  // "সাড়ে তিন টাকা" or "দেড় কেস" is not a whole taka or a whole count. A
+  // spoken draft never guesses: rounding it, or dropping it and reading the
+  // next number instead, would put a wrong figure in front of the owner.
+  if (scanAmounts(numbers).some((hit) => !Number.isInteger(hit.value))) {
+    return {
+      kind: null,
+      notes: ["ভগ্নাংশ (যেমন সাড়ে তিন, দেড়) ভয়েসে নেওয়া হয় না। পুরো সংখ্যায় বলুন, বা ফর্মে লিখুন।"],
+    };
+  }
+  const qty = findQty(numbers);
+  const price = findPrice(numbers);
+  const received = findReceived(numbers);
+  const paid = findPaid(numbers);
   const fromConsignment = /রাখা মাল|কনসাইন/.test(text);
   const payFull = /সব টাকা পে|পুরোটা পে|পুরো টাকা পে|নগদ বিক্রি/.test(text);
 
@@ -119,18 +141,17 @@ export function parseUtterance(input: string, books: Books): ParseResult {
 
   if (kind === "expense") {
     result.expenseLabel = expenseLabel(text);
-    const amount = received ?? paid ?? lastMoney(text);
+    const amount = received ?? paid ?? lastMoney(numbers);
     if (amount != null) result.amountTaka = amount;
   }
 
   if (kind === "purchase") {
     if (price != null) result.costTaka = price;
-    const supplier = findParty(text, books.parties);
     if (supplier) result.partyId = supplier.id;
   }
 
   if (kind === "payment") {
-    const amount = paid ?? lastMoney(text);
+    const amount = paid ?? lastMoney(numbers);
     if (amount != null) {
       result.paidTaka = amount;
       result.paidKnown = true;
@@ -220,7 +241,9 @@ export function draftFromParse(text: string, result: ParseResult, books: Books):
 
 function findParty(text: string, parties: Party[]): Party | undefined {
   const ranked = parties
-    .flatMap((party) => [party.name, ...party.aliases].map((alias) => ({ party, alias: normalizeText(alias) })))
+    .flatMap((party) =>
+      [party.name, ...party.aliases].map((alias) => ({ party, alias: normalizeText(alias) })),
+    )
     .filter((item) => item.alias.length >= 2)
     .sort((a, b) => b.alias.length - a.alias.length);
   return ranked.find((item) => text.includes(item.alias))?.party;
@@ -254,8 +277,7 @@ function findQty(text: string): { qty: number; unit: "pack" | "pcs" } | null {
 function findPrice(text: string): number | null {
   const at = text.search(/প্রতি/);
   if (at < 0) return null;
-  const nums = scanAmounts(text.slice(at, at + 40));
-  return nums[0]?.value ?? null;
+  return firstAmountFrom(text, at, 40);
 }
 
 function findReceived(text: string): number | null {
@@ -293,8 +315,35 @@ function amountBeside(text: string, index: number, pattern: RegExp): number | nu
   const before = amountEndingBefore(text, index, 14);
   if (before != null) return before;
   const word = pattern.exec(text.slice(index))?.[0].length ?? 0;
-  const after = scanAmounts(text.slice(index + word, index + word + 18));
-  return after[0]?.value ?? null;
+  return firstAmountFrom(text, index + word, 18);
+}
+
+/*
+ * The first amount that starts within `span` characters of `from`. It is
+ * picked from one scan of the whole sentence: scanning a slice instead could
+ * cut "তেরো হাজার দেড়শো" short, or leave "আড়াই" of "পাঁচ লাখ আড়াই হাজার" alone.
+ */
+function firstAmountFrom(text: string, from: number, span: number): number | null {
+  const hit = scanAmounts(text).find((item) => item.start >= from && item.start < from + span);
+  return hit?.value ?? null;
+}
+
+/*
+ * Replace each matched party or product name with "_" of the same length, so
+ * positions still line up with `text`. "_" is neither Bangla nor a space: a
+ * number next to it still reads, and two amounts either side of a removed name
+ * are not merged into one.
+ */
+function blankNames(text: string, named: ({ name: string; aliases: string[] } | undefined)[]) {
+  let out = text;
+  for (const item of named) {
+    if (!item) continue;
+    for (const alias of [item.name, ...item.aliases].map(normalizeText)) {
+      if (alias.length < 2) continue;
+      out = out.split(alias).join("_".repeat(alias.length));
+    }
+  }
+  return out;
 }
 
 function lastMoney(text: string): number | null {

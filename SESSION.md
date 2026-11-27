@@ -1,3 +1,11 @@
+# Bangla amount draft checks · 27 November 2026
+
+Follow-up to #50 and PR #51 at `4122254`. Keep the decimal point through normalization and ask for manual entry before making a draft when a decimal amount appears outside a matched name. Read spaced hundreds such as তিন শো as 300. Monetary posting precision remains a decision in #39.
+
+Seven regression cases failed before the fix. All 202 tests passed afterwards, including four Chromium specs with zero skips. Typecheck, lint, build and changed-file format checks passed. Lint reported three existing warnings.
+
+Review this follow-up with #51 and verify the combined head before merging to main. #60 passed hosted CI for the separate reset fix.
+
 # Ledger verification · 21 November 2026
 
 #20 passed the [post-merge CI gate](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834750585). Issue #18 adds generated ledger, dues, consignment, rounding and Bangla parser checks. Historical money and reporting defects are tracked in #35–#39 and #41. Use actual hosted results for release decisions.
