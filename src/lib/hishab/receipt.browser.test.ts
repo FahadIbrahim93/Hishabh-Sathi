@@ -203,6 +203,8 @@ browserTest(
       const showMore = () => page.getByRole("button", { name: "আরও", exact: true }).click();
       const arm = () => page.getByRole("button", { name: "ডেমো আবার শুরু", exact: true }).click();
       const reset = page.getByRole("button", { name: "হ্যাঁ, ডেমো ফেরান", exact: true });
+      await page.reload();
+      await page.locator('[data-screen="home"]').waitFor();
       await showMore();
       await arm();
       expect(await reset.isDisabled()).toBe(true);
