@@ -13,8 +13,8 @@
     "test": "vitest run",
     "test:ci": "vitest run --reporter=default --reporter=json --outputFile=.vitest-report.json && node scripts/check-test-gate.mjs .vitest-report.json",
     "lint": "eslint .",
-    "format": "prettier --write .",
-    "audit": "npm audit --audit-level=low"
+    "audit": "npm audit --audit-level=low",
+    "format": "prettier --write ."
   },
   "overrides": {
     "nf3": "0.3.17"
@@ -75,6 +75,7 @@
     "eslint-plugin-prettier": "^5.2.6",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
+    "fast-check": "^4.10.3",
     "globals": "^15.15.0",
     "playwright": "^1.62.0",
     "prettier": "^3.4.0",
