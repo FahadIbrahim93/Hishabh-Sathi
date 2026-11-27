@@ -114,21 +114,23 @@ export function explain(books: Books, entry: Entry): Explained {
         rows,
         foot: "নতুন বিক্রি নয়। শুধু আগের পাওনা কমেছে।",
       };
-    case "payment":
+    case "payment": {
+      const effect = paymentEffect(entry);
       add("কাকে", who);
       add("টাকা দিয়েছি", formatTaka(entry.meta.total ?? 0));
-      if (entry.meta.label === "দেনা শোধ") add("দেনা কমেছে", formatTaka(entry.meta.total ?? 0));
-      if (entry.meta.label === "পাওনা বাড়বে") add("পাওনা বেড়েছে", formatTaka(entry.meta.total ?? 0));
+      if (effect === "payable") add("দেনা কমেছে", formatTaka(entry.meta.total ?? 0));
+      if (effect === "receivable") add("পাওনা বেড়েছে", formatTaka(entry.meta.total ?? 0));
       return {
         title: "টাকা দিয়েছি",
         rows,
         foot:
-          entry.meta.label === "দেনা শোধ"
+          effect === "payable"
             ? "এটা টাকা পাওয়া নয়। আগের দেনা শোধ।"
-            : entry.meta.label === "পাওনা বাড়বে"
+            : effect === "receivable"
               ? "টাকা বেরিয়েছে। ওনার কাছে এই টাকা পাওনা থাকবে।"
               : "নগদ কমেছে। বিক্রি বাড়েনি।",
       };
+    }
     case "consign":
       add("দোকান", who);
       add("মাল", product?.name);
@@ -171,6 +173,13 @@ export function explain(books: Books, entry: Entry): Explained {
     default:
       return { title: "হিসাব", rows: [] };
   }
+}
+
+/** Derive the meaning of a payment from immutable journal lines, not display text. */
+export function paymentEffect(entry: Entry): "payable" | "receivable" | "expense" {
+  if (entry.lines.some((row) => row.account === "payable" && row.debit > 0)) return "payable";
+  if (entry.lines.some((row) => row.account === "receivable" && row.debit > 0)) return "receivable";
+  return "expense";
 }
 
 function cashOf(entry: Entry): number {
@@ -250,9 +259,17 @@ export function apply(books: Books, entry: Entry): Books {
   if (entry.kind === "payment") {
     const given = entry.meta.total ?? 0;
     if (given > balance(books, "cash")) throw new BooksError("নগদ এর মধ্যে কমে গেছে। আবার দেখুন।");
-    if (entry.partyId && entry.meta.label === "দেনা শোধ") {
-      const owed = balance(books, "payable", entry.partyId);
-      if (given > owed) throw new BooksError("দেনা এর মধ্যে কমে গেছে। আবার দেখুন।");
+    // Payable settlements must be validated by journal party/account, not by
+    // the mutable Bangla text stored in meta.label or entry.partyId.
+    const payableDebits = new Map<string, number>();
+    for (const row of entry.lines) {
+      if (row.account !== "payable" || row.debit <= 0) continue;
+      if (!row.partyId) throw new BooksError("দেনার দোকান খুঁজে পাওয়া যায়নি।");
+      payableDebits.set(row.partyId, (payableDebits.get(row.partyId) ?? 0) + row.debit);
+    }
+    for (const [partyId, amount] of payableDebits) {
+      const owed = balance(books, "payable", partyId);
+      if (amount > owed) throw new BooksError("দেনা এর মধ্যে কমে গেছে। আবার দেখুন।");
     }
   }
   let products = books.products;
