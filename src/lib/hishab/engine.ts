@@ -783,7 +783,7 @@ export function duesAging(books: Books, now = Date.now()): DueAging[] {
   const oneDay = 86_400_000;
   const rows: DueAging[] = [];
   for (const party of books.parties) {
-    if (party.archived) continue;
+    // An archived shop still owes what it owed: archiving forgives nothing.
     const receivable = balance(books, "receivable", party.id);
     if (receivable <= 0) continue;
     let lastAt = 0;
