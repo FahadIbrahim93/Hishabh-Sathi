@@ -5,7 +5,6 @@ import {
   type Account,
   type Books,
   type Entry,
-  type EntryMeta,
   type JournalLine,
   type Product,
   type StockMove,
@@ -806,8 +805,4 @@ export function productsAt(books: Books, location: string): { product: Product; 
   return books.products
     .map((product) => ({ product, qty: stockAt(books, product.id, location) }))
     .filter((row) => row.qty > 0);
-}
-
-export function metaOf(entry: Entry): EntryMeta {
-  return entry.meta;
 }
