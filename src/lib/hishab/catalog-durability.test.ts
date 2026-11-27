@@ -94,3 +94,33 @@ it("does not finish onboarding when the first shop write fails", async () => {
   expect(useHishab.getState().books.businessName).toBe("");
   expect(disk.businessName).toBe("");
 });
+
+it("requires a readable backup of the live books before resetting", async () => {
+  const original = useHishab.getState().exportBooks();
+  const unreadable = new Blob([original]);
+  vi.spyOn(unreadable, "text").mockRejectedValueOnce(new Error("read failed"));
+  const { resetDemo } = useHishab.getState();
+  await expect(resetDemo(unreadable)).rejects.toThrow();
+  await expect(resetDemo(new Blob(["{}"]))).rejects.toThrow();
+  await useHishab.getState().addParty("নতুন দোকান", "customer");
+  const current = useHishab.getState().books;
+  await expect(resetDemo(new Blob([original]))).rejects.toThrow();
+  expect(disk).toEqual(current);
+  expect(useHishab.getState().books).toEqual(current);
+});
+
+it("preserves a newer tab's books during demo reset", async () => {
+  const backup = new Blob([useHishab.getState().exportBooks()]);
+  disk = { ...disk, businessName: "অন্য ট্যাবের নাম" };
+  await expect(useHishab.getState().resetDemo(backup)).rejects.toThrow();
+  expect(disk.businessName).toBe("অন্য ট্যাবের নাম");
+});
+
+it("starts demo on an empty device and refuses to replace existing books from onboarding", async () => {
+  await loadDevice(emptyShop());
+  await useHishab.getState().startDemo();
+  expect(useHishab.getState().onboarded).toBe(true);
+  const current = disk;
+  await expect(useHishab.getState().startDemo()).rejects.toThrow();
+  expect(disk).toEqual(current);
+});

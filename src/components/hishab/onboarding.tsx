@@ -5,8 +5,7 @@ import { Primary, Secondary, ScreenHeader, Page, TextField } from "@/components/
 
 export function OnboardingScreen() {
   const createBusiness = useHishab((s) => s.createBusiness);
-  const resetDemo = useHishab((s) => s.resetDemo);
-  const setOnboarded = useHishab((s) => s.setOnboarded);
+  const startDemo = useHishab((s) => s.startDemo);
   const [name, setName] = useState("");
   const [cashTaka, setCashTaka] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -28,8 +27,7 @@ export function OnboardingScreen() {
   const useDemo = async () => {
     setSaving(true);
     try {
-      await resetDemo();
-      setOnboarded(true);
+      await startDemo();
     } catch (err) {
       setError(err instanceof Error ? err.message : "সেভ হয়নি। আবার চেষ্টা করুন।");
     } finally {
@@ -83,7 +81,7 @@ export function OnboardingScreen() {
           </p>
         ) : null}
         <div className="grid grid-cols-2 gap-3">
-          <Secondary onClick={useDemo}>ডেমো দোকান দিয়ে শুরু করুন</Secondary>
+          <Secondary onClick={useDemo} disabled={saving}>ডেমো দোকান দিয়ে শুরু করুন</Secondary>
           <Primary onClick={create} disabled={saving || !name.trim()}>
             শুরু করুন
           </Primary>

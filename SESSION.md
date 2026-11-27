@@ -1,3 +1,11 @@
+# Demo reset protection · 27 November 2026
+
+Issue #49, reset scope. An existing shop must select a readable, valid backup matching the current books before replacing them with demo data. The existing IndexedDB transaction rejects a stale tab. A new device can still start with demo data from onboarding.
+
+Local checks passed on the fix based on `da0b35d`. The strict suite ran 122 tests including five Chromium specs with zero skips. The reset spec downloaded a backup, tested cancellation and an aborted write, retried after reload and restored the exact original books. Typecheck, lint and build passed. Lint reported three existing warnings.
+
+Next review #42 as the ledger test baseline, then settle #35 before combining the ledger fixes in #48. The remaining reporting defects stay tracked in #49.
+
 # Hosted CI gate · 21 November 2026
 
 #15 merged via #34. Main passed [dependency and PostgreSQL verification](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834416515) and [CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834416531) on 55feee0. Issue #20 now enforces the lockfile, dependency audit and all four browser scenarios. The audit script lives in the same change as its workflow invocation.

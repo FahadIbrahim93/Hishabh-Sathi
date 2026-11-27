@@ -194,6 +194,65 @@ browserTest(
 );
 
 browserTest(
+  "preserves the current books when demo reset is cancelled or interrupted",
+  () =>
+    withReceiptPage(async (page) => {
+      await page.getByRole("button", { name: "সেভ করুন", exact: true }).click();
+      await page.locator('[data-screen="receipt"]').waitFor();
+      const original: string = await page.evaluate("window.exportTestBooks()");
+      const showMore = () => page.getByRole("button", { name: "আরও", exact: true }).click();
+      const arm = () => page.getByRole("button", { name: "ডেমো আবার শুরু", exact: true }).click();
+      const reset = page.getByRole("button", { name: "হ্যাঁ, ডেমো ফেরান", exact: true });
+      await showMore();
+      await arm();
+      expect(await reset.isDisabled()).toBe(true);
+      await page.getByRole("button", { name: "ডেমো বাতিল", exact: true }).click();
+      expect(await page.evaluate("window.exportTestBooks()")).toBe(original);
+
+      await arm();
+      const [download] = await Promise.all([
+        page.waitForEvent("download"),
+        page.getByRole("button", { name: "বর্তমান খাতার ব্যাকআপ নিন", exact: true }).click(),
+      ]);
+      const backupPath = await download.path();
+      await page.getByLabel("ডেমোর জন্য ব্যাকআপ ফাইল বেছে নিন").setInputFiles(backupPath);
+      await page.evaluate(() => {
+        const put = IDBObjectStore.prototype.put;
+        IDBObjectStore.prototype.put = function (...args) {
+          IDBObjectStore.prototype.put = put;
+          const request = put.apply(this, args);
+          this.transaction.abort();
+          return request;
+        };
+      });
+      await reset.click();
+      await page.getByRole("alert").filter({ hasText: "সেভ হয়নি" }).waitFor();
+      expect(await page.evaluate("window.exportTestBooks()")).toBe(original);
+      await page.reload();
+      await page.locator('[data-screen="home"]').waitFor();
+      expect(await page.evaluate("window.exportTestBooks()")).toBe(original);
+
+      await showMore();
+      await arm();
+      await page.getByLabel("ডেমোর জন্য ব্যাকআপ ফাইল বেছে নিন").setInputFiles(backupPath);
+      await reset.click();
+      await page.getByText("ডেমো হিসাব আবার বসানো হয়েছে", { exact: true }).waitFor();
+      await page.reload();
+      await page.locator('[data-screen="home"]').waitFor();
+      expect(await page.evaluate("window.exportTestBooks()")).not.toBe(original);
+
+      await showMore();
+      await page.locator('input[type="file"]').setInputFiles(backupPath);
+      await page.getByRole("button", { name: "ফেরত আনুন", exact: true }).click();
+      await page.getByText("ব্যাকআপ ফেরত আনা হয়েছে", { exact: true }).waitFor();
+      await page.reload();
+      await page.locator('[data-screen="home"]').waitFor();
+      expect(await page.evaluate("window.exportTestBooks()")).toBe(original);
+    }),
+  90_000,
+);
+
+browserTest(
   "retries a failed reversal and prevents another tab from doubling it",
   () =>
     withReceiptPage(async (page) => {
