@@ -2,6 +2,14 @@
 
 #15 merged via #34. Main passed [dependency and PostgreSQL verification](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834416515) and [CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44834416531) on 55feee0. Issue #20 now enforces the lockfile, dependency audit and all four browser scenarios. The audit script lives in the same change as its workflow invocation.
 
+# Demo reset protection · 27 November 2026
+
+Issue #49, reset scope. An existing shop must select a readable, valid backup matching the current books before replacing them with demo data. The existing IndexedDB transaction rejects a stale tab. A new device can still start with demo data from onboarding.
+
+Local checks passed on the fix based on `da0b35d`. The strict suite ran 122 tests including five Chromium specs with zero skips. The reset spec downloaded a backup, tested cancellation and an aborted write, retried after reload and restored the exact original books. Typecheck, lint and build passed. Lint reported three existing warnings.
+
+The #42 ledger test branch also passed locally, with 128 tests. Its application and test changes combined with this fix passed 132 tests, including five Chromium specs. Settle #35 before combining the financial behavior changes in #48. The remaining reporting defects stay tracked in #49.
+
 # Dependency verification · 21 November 2026
 
 Catalog issue #32 and PR #33 merged. [Post-merge main CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/44833849170) passed for 863149d. Current issue #15 requires a new hosted audit and an isolated PostgreSQL auth schema check. Verify merge CI before proceeding to #20.

@@ -356,6 +356,9 @@ export function MoreScreen() {
   const push = useHishab((s) => s.push);
   const open = useOpen();
   const [arm, setArm] = useState(false);
+  const [resetBackup, setResetBackup] = useState<File | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState("");
   const report = audit(books);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const restoring = useHishab((s) => s.restoring);
@@ -447,22 +450,53 @@ export function MoreScreen() {
         <Secondary onClick={() => push({ id: "report" })}>পুরো হিসাব</Secondary>
         <Secondary onClick={() => push({ id: "guide" })}>কীভাবে হিসাব হয়</Secondary>
         {arm ? (
-          <Callout tone="warn" title="ডেমো আবার শুরু?" body="আপনার নতুন হিসাব মুছে রফিক ট্রেডার্সের আগের খাতা বসবে।" />
-        ) : null}
-        <button
-          type="button"
-          onClick={() => {
-            if (!arm) {
-              setArm(true);
-              return;
-            }
-            void resetDemo().then(() => setArm(false)).catch(() => undefined);
-          }}
-          className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-card font-display text-base font-semibold text-clay ring-1 ring-line"
-        >
-          <RotateCcw className="size-4" aria-hidden="true" />
-          {arm ? "হ্যাঁ, ডেমো ফেরান" : "ডেমো আবার শুরু"}
-        </button>
+          <div className="grid gap-3">
+            <Callout tone="warn" title="ডেমো আবার শুরু?" body="বর্তমান খাতার জায়গায় ডেমো বসবে। আগে বর্তমান খাতার ব্যাকআপ ডাউনলোড করে সেই ফাইলটি বেছে নিন।" />
+            <Secondary onClick={downloadBackup} disabled={resetting}>বর্তমান খাতার ব্যাকআপ নিন</Secondary>
+            <label className="grid gap-2 text-sm text-ink">
+              ডেমোর জন্য ব্যাকআপ ফাইল বেছে নিন
+              <input
+                type="file"
+                accept=".json,application/json"
+                disabled={resetting}
+                onChange={(event) => {
+                  setResetBackup(event.currentTarget.files?.[0] ?? null);
+                  setResetError("");
+                }}
+              />
+            </label>
+            <Primary
+              disabled={!resetBackup || resetting || restoring}
+              onClick={async () => {
+                if (!resetBackup || resetting) return;
+                setResetting(true);
+                setResetError("");
+                try {
+                  await resetDemo(resetBackup);
+                  setArm(false);
+                  setResetBackup(null);
+                } catch (error) {
+                  setResetError(error instanceof Error ? error.message : "ডেমো ফেরানো যায়নি।");
+                } finally {
+                  setResetting(false);
+                }
+              }}
+            >
+              {resetting ? "ডেমো ফেরানো হচ্ছে…" : "হ্যাঁ, ডেমো ফেরান"}
+            </Primary>
+            <Secondary disabled={resetting} onClick={() => {
+              setArm(false);
+              setResetBackup(null);
+              setResetError("");
+            }}>ডেমো বাতিল</Secondary>
+            {resetError ? <p role="alert" className="text-sm text-clay">{resetError}</p> : null}
+          </div>
+        ) : (
+          <Secondary onClick={() => setArm(true)}>
+            <RotateCcw className="size-4" aria-hidden="true" />
+            ডেমো আবার শুরু
+          </Secondary>
+        )}
       </Page>
     </div>
   );

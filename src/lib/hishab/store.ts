@@ -205,7 +205,8 @@ interface HishabState {
   exportBooks: () => string;
   restoring: boolean;
   importBooks: (source: string | Blob) => Promise<void>;
-  resetDemo: () => Promise<void>;
+  startDemo: () => Promise<void>;
+  resetDemo: (backupFile: Blob) => Promise<void>;
   dismissToast: () => void;
 }
 
@@ -480,9 +481,22 @@ export const useHishab = create<HishabState>((set, get) => ({
       set({ restoring: false });
     }
   },
-  resetDemo: () => {
-    const books = makeSeed();
-    return commitCatalog(books, {
+  startDemo: async () => {
+    if (!get().ready || !isEmptyBooks(get().books)) {
+      throw new BooksError("এই ফোনে আগে থেকেই হিসাব আছে।");
+    }
+    await commitCatalog(makeSeed(), { onboarded: true });
+  },
+  resetDemo: async (backupFile) => {
+    const previous = get().books;
+    const raw = await backupFile.text().catch(() => {
+      throw new BooksError("ব্যাকআপ ফাইলটি পড়া যায়নি।");
+    });
+    const backup = parseBackup(raw);
+    if (get().books !== previous || JSON.stringify(backup) !== JSON.stringify(previous)) {
+      throw new BooksError("ব্যাকআপটি বর্তমান হিসাবের সঙ্গে মেলেনি। নতুন ব্যাকআপ নিন।");
+    }
+    await commitCatalog(makeSeed(), {
       nav: [{ id: "home" }],
       draft: null,
       toast: "ডেমো হিসাব আবার বসানো হয়েছে",
