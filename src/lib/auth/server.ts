@@ -5,27 +5,27 @@
  * local email/password, flip the flag in `./email-password` only (see auth skill).
  *
  * The app runs its own Better Auth at `/api/auth/*`, so the session cookie stays
- * on this app's own origin. Sign-in federates to the shared **Grok auth broker**
+ * on this app's own origin. When configured, sign-in federates to the **Grok auth broker**
  * (`GROK_AUTH_ISSUER`) via the `genericOAuth` plugin — the broker brokers the
  * upstream sign-in methods (Google, X, …) and holds their shared secrets; this
  * app only holds its own client id/secret and names the upstream it wants via
  * each provider's `idp` hint.
  *
- * Tri-mode:
+ * Modes:
  *   - Deployed: the deployer injects a per-app `GROK_AUTH_*` + `BETTER_AUTH_URL`
  *     + `DATABASE_URL`, so real federated auth is persisted in Postgres.
  *   - Sandbox live preview: requires explicitly provisioned server credentials;
  *     otherwise broker sign-in is disabled (no shared preview secret). When
- *     configured, sessions
- *     and identities persist in the embedded PGLite DB (same DB as app data);
+ *     configured, sessions and identities persist in the embedded PGLite DB
+ *     (same DB as app data);
  *     the process restart wipes both. Live-preview iframe clients use a bearer
  *     token (partitioned cookies) — see `client.ts`.
  *   - Off (`VITE_AUTH_ENABLED=false`, the shipped default): no providers;
  *     `requireUserId` resolves a dev user with no database configured, and
  *     throws fail-closed once `DATABASE_URL` is set (see `verify.server.ts`).
  *
- * NEVER import this from client code — it pulls in `pg` + server-only credentials +
- * server-only Better Auth internals. The client uses `@/lib/auth/client`;
+ * NEVER import this from client code — it pulls in `pg` and server-only
+ * Better Auth internals. The client uses `@/lib/auth/client`;
  * components read the user via `@/lib/auth/use-current-user`; server functions get
  * a verified id via `@/lib/auth/middleware`.
  */
