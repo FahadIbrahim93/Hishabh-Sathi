@@ -1,3 +1,28 @@
+# PR review and safe merge checkpoint · 27 November 2026
+
+## Starting baseline
+- Main at `10e442345160ce31816c367c75857af03c87a508` had [passing CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/45945098220).
+- Read this `SESSION.md`, inspected eight open PRs (#57, #56, #55, #48, #6, #5, #3, #2), diffs/changed files and hosted status; did not bypass branch protection or publish/deploy.
+- Five non-draft dependency PRs failed hosted CI on their current heads: #2, #3, #6, #57 had `npm ci` lockfile EUSAGE (missing `lru-cache@11.5.3`); #5 hit ESLint 9 vs `@eslint/js` 10 peer resolution ERESOLVE. [Issue #16](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/16) now records evidence and repair criteria.
+- Draft #56 deletes unused template code but fails the strict test-count gate; draft #48 contains high-risk mixed ledger/aging/cash/auth/CI changes and cannot merge against current main. Both remain **open** with review notes.
+
+## Safe fix merged
+- Draft [#55](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/55) had a narrow archived-shop dues fix and three regression tests, but was 19 commits behind. Reapplied **only** these changes on fresh main as [PR #62](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/62); original #55 subsequently closed as superseded (unmerged).
+- Exact change: remove `if (party.archived) continue;` in `duesAging` while retaining `receivable <= 0` exclusion. Three tests cover archived positive due, all-shop positive totals, archived zero due exclusion.
+- [PR #62 hosted CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/45976261048) **success**, clean/mergeable against original main. Squash merged as [`541c593`](https://github.com/FahadIbrahim93/Hishabh-Sathi/commit/541c59349f11d76ab2790eb196d0d139d2a5ca79).
+- [Post-merge main CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/45976552511) **success**; retrieved updated `engine.ts` from main and verified the archived-party exclusion is absent.
+- [Issue #38](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/38) updated with partial-fix evidence and **kept open**. Its partial-payment debt-age and allocation policy are still unresolved.
+
+## Outstanding PR decisions and next session order
+1. Restore safe lockfile consistency and peer compatibility for #2/#3/#6/#57 and handle #5 as a coordinated ESLint major migration, not standalone. Do not merge red checks; require `npm ci`, audit, strict non-skipping tests, build and UI checks.
+2. Keep #48 draft until financial corrections are split into reviewed, failing-test-first changes with owner-approved rules. Never mix secrets or environment config into broad ledger PRs.
+3. Keep #56 draft pending test-gate resolution and re-verification on current main. Do not silently lower the test floor.
+4. Resume priority financial correctness and actual Android QA per issues #35–#39, #41, #43, #49, #52–#54. No production readiness, merchant data, SMS, cloud sync or deployment claim has been established.
+
+**No other open PR met the safe-merge bar in this review.** This record documents real GitHub evidence, not an independent full production audit.
+
+---
+
 # Bangla amount draft checks · 27 November 2026
 
 Follow-up to #50 and PR #51 at `4122254`. Keep the decimal point through normalization and ask for manual entry before making a draft when a decimal amount appears outside a matched name. Read spaced hundreds such as তিন শো as 300. Monetary posting precision remains a decision in #39.
