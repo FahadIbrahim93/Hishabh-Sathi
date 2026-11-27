@@ -208,6 +208,39 @@ describe("voice drafts carry fraction amounts exactly", () => {
     });
   }
 
+  it.each(["১.৫ হাজার", "1.5 হাজার", "১.5 লাখ", "১২৫.৫০", "125.00"])(
+    "sends decimal amount %s to manual entry",
+    (amount) => {
+      const parsed = parseUtterance(`করিমের কাছ থেকে ${amount} টাকা পেয়েছি`, books);
+      expect(parsed.kind).toBeNull();
+      expect(parsed.amountTaka).toBeUndefined();
+      expect(parsed.notes.join(" ")).toContain("ফর্মে লিখুন");
+    },
+  );
+
+  it("keeps a decimal in a matched product name out of the amount check", () => {
+    const named: typeof books = {
+      ...books,
+      products: [
+        ...books.products,
+        { ...books.products[0]!, id: "coke", name: "১.৫ লিটার কোক", aliases: [] },
+      ],
+    };
+    const parsed = parseUtterance("রহিম স্টোরে দুই কেস ১.৫ লিটার কোক বিক্রি করেছি", named);
+    expect(parsed.kind).toBe("sale");
+    expect(parsed.productId).toBe("coke");
+    expect(parsed.qtyInput).toBe(2);
+  });
+
+  it.each([
+    ["তিন শো", 300],
+    ["সাড়ে তিন শো", 350],
+  ] as const)("reads a spoken hundred with a space: %s", (amount, taka) => {
+    const parsed = parseUtterance(`করিমের কাছ থেকে ${amount} টাকা পেয়েছি`, books);
+    expect(parsed.kind).toBe("collection");
+    expect(parsed.receivedTaka).toBe(taka);
+  });
+
   it("reads a digit before হাজার as thousands", () => {
     const parsed = parseUtterance("করিমের কাছ থেকে ৩ হাজার টাকা পেয়েছি", books);
     expect(parsed.kind).toBe("collection");

@@ -243,7 +243,8 @@ function foldNukta(input: string): string {
 export function normalizeText(input: string): string {
   return foldNukta(input)
     .replace(/[০-৯]/g, (ch) => String(ch.charCodeAt(0) - 0x09e6))
-    .replace(/[।,.!?;:،"'“”]/g, " ")
+    .replace(/(?<!\d)\.|\.(?!\d)/g, " ")
+    .replace(/[।,!?;:،"'“”]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -267,9 +268,11 @@ function phrases(): Phrase[] {
     list.push({ text: w, value: n, unit: 1 });
   }
   for (let h = 1; h <= 9; h += 1) {
-    const stem = h === 1 ? "একশ" : `${N99[h]}শ`;
-    list.push({ text: `${stem}ো`, value: h * 100, unit: 100 });
-    list.push({ text: stem, value: h * 100, unit: 100 });
+    for (const suffix of ["শো", "শ"]) {
+      const value = h * 100;
+      list.push({ text: `${N99[h]}${suffix}`, value, unit: 100 });
+      list.push({ text: `${N99[h]} ${suffix}`, value, unit: 100 });
+    }
   }
   list.push(
     { text: "লাখ", value: 100_000 },

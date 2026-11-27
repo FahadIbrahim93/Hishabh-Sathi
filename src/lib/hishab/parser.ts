@@ -92,6 +92,13 @@ export function parseUtterance(input: string, books: Books): ParseResult {
   // A name is not an amount: "দেড় লিটার কোক" is a product and "আড়াই হাজারী
   // স্টোর" a shop. Numbers are read from the sentence with those names blanked.
   const numbers = blankNames(text, [party, product, supplier]);
+  // Keep explicit decimal amounts out of drafts until the posting policy is defined.
+  if (/\d\.\d/.test(numbers)) {
+    return {
+      kind: null,
+      notes: ["দশমিক সংখ্যা পাওয়া গেছে। সঠিক পরিমাণ ফর্মে লিখুন।"],
+    };
+  }
   // "সাড়ে তিন টাকা" or "দেড় কেস" is not a whole taka or a whole count. A
   // spoken draft never guesses: rounding it, or dropping it and reading the
   // next number instead, would put a wrong figure in front of the owner.
