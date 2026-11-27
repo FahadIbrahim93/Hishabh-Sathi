@@ -9,6 +9,7 @@ import {
   buildReturn,
   buildSale,
   explain,
+  paymentEffect,
   productById,
   productsAt,
   stockAt,
@@ -182,12 +183,13 @@ export function previewDraft(books: Books, draft: Draft, at = Date.now()): Previ
     const entry = entryFromDraft(books, draft, "preview-temp", at);
     const next = apply(structuredClone(books), entry);
     const view = explain(books, entry);
+    const effect = entry.kind === "payment" ? paymentEffect(entry) : undefined;
     const after: { k: string; v: string }[] = [];
     if (entry.partyId && (entry.kind === "sale" || entry.kind === "collection" || entry.kind === "return" || entry.kind === "payment")) {
-      if (entry.kind !== "payment" || entry.meta.label === "পাওনা বাড়বে") {
+      if (entry.kind !== "payment" || effect === "receivable") {
         after.push({ k: "এই দোকানের পাওনা হবে", v: formatTaka(balance(next, "receivable", entry.partyId)) });
       }
-      if (entry.kind === "payment" && entry.meta.label === "দেনা শোধ") {
+      if (entry.kind === "payment" && effect === "payable") {
         after.push({ k: "এখন দেনা", v: formatTaka(balance(next, "payable", entry.partyId)) });
       }
     }
@@ -218,7 +220,7 @@ export function previewDraft(books: Books, draft: Draft, at = Date.now()): Previ
       rows: view.rows,
       foot: view.foot,
       readback: readback(draft, books),
-      banner: bannerFor(entry.kind, Boolean(entry.meta.fromConsignment), entry.meta.returnMode, entry.meta.label),
+      banner: bannerFor(entry.kind, Boolean(entry.meta.fromConsignment), entry.meta.returnMode, effect),
       after,
     };
   } catch (error) {
@@ -230,7 +232,7 @@ function bannerFor(
   kind: Entry["kind"],
   fromConsignment: boolean,
   returnMode?: "sold" | "consign",
-  label?: string,
+  effect?: ReturnType<typeof paymentEffect>,
 ): Preview["banner"] {
   if (kind === "consign" || returnMode === "consign") {
     return {
@@ -245,10 +247,10 @@ function bannerFor(
     };
   }
   if (kind === "payment") {
-    if (label === "দেনা শোধ") {
+    if (effect === "payable") {
       return { title: "টাকা দিয়েছেন", body: "এটা টাকা পাওয়া নয়। আগের দেনা শোধ হবে।" };
     }
-    if (label === "পাওনা বাড়বে") {
+    if (effect === "receivable") {
       return { title: "টাকা দিয়েছেন", body: "পেয়েছি নয়। এই টাকা এখন ওনার পাওনা।" };
     }
     return { title: "টাকা দিয়েছেন", body: "নগদ কমবে। বিক্রি বাড়বে না।" };
