@@ -735,36 +735,44 @@ export function revenueBetween(books: Books, start: number, end: number): number
 }
 
 export function collectedBetween(books: Books, start: number, end: number): number {
+  // Corrections have the same receipt/refund fields as their originals.
+  // Only the original transaction kind tells us what must be undone.
+  const byId = new Map(books.entries.map((entry) => [entry.id, entry]));
   let total = 0;
   for (const entry of books.entries) {
     if (entry.at < start || entry.at >= end) continue;
-    if (entry.kind === "sale" || entry.kind === "collection") total += entry.meta.received ?? 0;
-    if (entry.kind === "return") total -= entry.meta.refund ?? 0;
+    const original = entry.kind === "reversal" ? byId.get(entry.reversesEntryId ?? "") : entry;
+    if (!original) continue;
+    const direction = entry.kind === "reversal" ? -1 : 1;
+    if (original.kind === "sale" || original.kind === "collection") {
+      total += direction * (original.meta.received ?? 0);
+    }
+    if (original.kind === "return") {
+      total -= direction * (original.meta.refund ?? 0);
+    }
+  }
+  return total;
+}
+
+function netDebitBetween(books: Books, account: Account, start: number, end: number): number {
+  // Use the actual signed journal lines: reversal credits must cancel debits.
+  let total = 0;
+  for (const entry of books.entries) {
+    if (entry.at < start || entry.at >= end) continue;
+    for (const row of entry.lines) {
+      if (row.account === account) total += row.debit - row.credit;
+    }
   }
   return total;
 }
 
 export function cogsBetween(books: Books, start: number, end: number): number {
-  let debit = 0;
-  for (const entry of books.entries) {
-    if (entry.at < start || entry.at >= end) continue;
-    for (const row of entry.lines) {
-      if (row.account === "cogs") debit += row.debit;
-    }
-  }
-  return debit;
+  return netDebitBetween(books, "cogs", start, end);
 }
 
 export function expenseBetween(books: Books, start: number, end: number): number {
-  let credit = 0;
-  for (const entry of books.entries) {
-    if (entry.at < start || entry.at >= end) continue;
-    if (entry.kind !== "expense") continue;
-    for (const row of entry.lines) {
-      if (row.account === "expense") credit += row.credit;
-    }
-  }
-  return credit;
+  // Party-less payments post an expense line too, even though their kind is "payment".
+  return netDebitBetween(books, "expense", start, end);
 }
 
 export function profitBetween(books: Books, start: number, end: number): number {
