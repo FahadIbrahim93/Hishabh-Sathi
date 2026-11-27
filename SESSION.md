@@ -1,3 +1,26 @@
+# Engineering session · 28 November 2026 — verified reporting, auth and ledger fixes
+
+## Starting state and discipline
+- Started from `main@53a92de` with [green CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/45977107390), read `SESSION.md` and the active board, then handled separate, regression-backed tasks without deployment, historical journal edits, dependency upgrades or owner-only policy decisions.
+- Each behavior change lived in its own branch and PR. Isolated test-only baseline PRs were closed without merging. The reported post-merge verification uses **main branch CI**, not just a PR check.
+
+## Completed and independently verified
+
+1. **Financial reports, issue #49 (partial).** [PR #64](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/64) merged as [`17fe759`](https://github.com/FahadIbrahim93/Hishabh-Sathi/commit/17fe7595524661f0c04fbc94cdfc45c6ae3b2607). Expenses (including party-less payment expense lines) and COGS now net debit minus credit, and reversed collections/sales subtract from received amounts. [Failing baseline](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/46069600747): 4/5 new tests failed. [Corrected PR](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/46069534357): 224 passed, 0 failed/skipped, 5 browser specs; audit/typecheck/lint/build green. [Post-merge main CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/46069862377): **success**. #49 **stays open** for unrelated catalog/script/security references.
+2. **Source-embedded OAuth credential, issue #66 (partial).** [PR #67](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/67) merged as [`ccbbec9`](https://github.com/FahadIbrahim93/Hishabh-Sathi/commit/ccbbec9e38a931834943ff42e4938f26aa3f4675). Deleted unsafe preview credential/fallback; broker federation now requires explicit server credentials. Six new fail-closed/source tests. [PR CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/46070105870): 230 passed, 0 skipped, 5 browser specs; [PR auth verification](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/46070105886): success. [Main CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/46070347132) and [main auth check](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/46070347133): both **success**. **Critical owner follow-up:** published credential must still be revoked/rotated in the upstream broker and logs reviewed. This is not proven by the source patch. Do not expose values.
+3. **Label-independent ledger validation, issue #53.** [PR #69](https://github.com/FahadIbrahim93/Hishabh-Sathi/pull/69) merged as [`0034b47`](https://github.com/FahadIbrahim93/Hishabh-Sathi/commit/0034b4773daf146e95d03c1945bcf169c21489d1). Payable debits now validate against their journal party regardless of mutable Bangla label or outer metadata; explain/preview follow journal meaning. Old entries remain readable without migration. [Baseline CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/46070524991): 4/5 new tests failed; [fixed PR CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/46070583823): 235 passed, 0 failed/skipped, 5 browser specs. [Main CI](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/46070812036) **success**. #53 was closed with evidence.
+
+## Current verified main and handoff
+- Verified main at start of this documentation change: [`0034b47`](https://github.com/FahadIbrahim93/Hishabh-Sathi/commit/0034b4773daf146e95d03c1945bcf169c21489d1), [strict CI success](https://github.com/FahadIbrahim93/Hishabh-Sathi/actions/runs/46070812036). No real Android-device acceptance, merchant field pilot, production auth, offline PWA, server sync or launch sign-off.
+- [Delivery board #58](https://github.com/FahadIbrahim93/Hishabh-Sathi/issues/58) updated and #53 closed. Owner security issue #66 remains **OPEN** until upstream rotation evidence exists.
+- High-priority next engineering: choose explicit money precision/rounding rule (#39) with owner; isolate safe sale/reversal/return safeguards (#41), inventory costing (#37) and report/catalog remnants (#49) from old mixed draft #48; resolve cash funding (#35), customer credit (#36), aging (#38), stock corrections (#52), and health/recovery semantics (#54) only with approved business examples.
+- Dependency PRs #2/#3/#5/#6/#57 still failed their lockfile/peer checks at last review; draft #56 broke the strict test floor. Do not merge them without repair and renewed verification.
+- Real Android backup/restore (#43), installable offline shell (#17), consented distributor/five-shop pilot (#45), Bangla voice benchmark (#44), tenant-safe sync (#21) and release gate (#46) remain future, unverified work.
+
+**Next active issue:** after the security owner follows up on #66, a small failing-test-first PR for stock return/reversal integrity #41 can be prepared while awaiting the founder's cash/credit/rounding policies. Keep financial policy changes isolated, preserve existing journals and require post-merge main CI.
+
+---
+
 # PR review and safe merge checkpoint · 27 November 2026
 
 ## Starting baseline
